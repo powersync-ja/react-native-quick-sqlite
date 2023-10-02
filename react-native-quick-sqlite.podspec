@@ -1,6 +1,10 @@
 require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
+if (File.exist?(File.join(__dir__, "meta.json")))
+  meta = JSON.parse(File.read(File.join(__dir__, "meta.json")))
+  package["version"] = meta["version"]
+end
 
 Pod::Spec.new do |s|
   s.name         = "react-native-quick-sqlite"
@@ -25,6 +29,7 @@ Pod::Spec.new do |s|
   s.dependency "React-callinvoker"
   s.dependency "React"
   s.dependency "React-Core"
+  s.dependency 'powersync-sqlite-core'
 
   if ENV['QUICK_SQLITE_USE_PHONE_VERSION'] == '1' then
     s.exclude_files = "cpp/sqlite3.c", "cpp/sqlite3.h"

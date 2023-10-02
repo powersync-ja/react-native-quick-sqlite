@@ -9,9 +9,7 @@ if (global.__QuickSQLiteProxy == null) {
   const QuickSQLiteModule = NativeModules.QuickSQLite;
 
   if (QuickSQLiteModule == null) {
-    throw new Error(
-      'Base quick-sqlite module not found. Maybe try rebuilding the app.'
-    );
+    throw new Error('Base quick-sqlite module not found. Maybe try rebuilding the app.');
   }
 
   // Check if we are running on-device (JSI)
@@ -111,12 +109,11 @@ export interface FileLoadResult extends BatchQueryResult {
 
 export interface Transaction {
   commit: () => QueryResult;
+  commitAsync: () => Promise<QueryResult>;
   execute: (query: string, params?: any[]) => QueryResult;
-  executeAsync: (
-    query: string,
-    params?: any[] | undefined
-  ) => Promise<QueryResult>;
+  executeAsync: (query: string, params?: any[] | undefined) => Promise<QueryResult>;
   rollback: () => QueryResult;
+  rollbackAsync: () => Promise<QueryResult>;
 }
 
 export interface PendingTransaction {
@@ -132,40 +129,53 @@ export interface PendingTransaction {
   start: () => void;
 }
 
+export enum RowUpdateType {
+  SQLITE_INSERT = 18,
+  SQLITE_DELETE = 9,
+  SQLITE_UPDATE = 23
+}
+export interface UpdateNotification {
+  opType: RowUpdateType;
+  table: string;
+  rowId: number;
+}
+
+export type UpdateCallback = (update: UpdateNotification) => void;
+
+/**
+ * Entry point for update callbacks
+ */
+global.triggerUpdateHook = function (dbName: string, table: string, opType: RowUpdateType, rowId: number) {
+  const callback = updateCallbacks[dbName];
+  if (!callback) {
+    return;
+  }
+
+  callback({
+    opType,
+    table,
+    rowId
+  });
+  return null;
+};
+
 interface ISQLite {
   open: (dbName: string, location?: string) => void;
   close: (dbName: string) => void;
   delete: (dbName: string, location?: string) => void;
-  attach: (
-    mainDbName: string,
-    dbNameToAttach: string,
-    alias: string,
-    location?: string
-  ) => void;
+  attach: (mainDbName: string, dbNameToAttach: string, alias: string, location?: string) => void;
   detach: (mainDbName: string, alias: string) => void;
-  transaction: (
-    dbName: string,
-    fn: (tx: Transaction) => Promise<void> | void
-  ) => Promise<void>;
+  transaction: (dbName: string, fn: (tx: Transaction) => Promise<void> | void) => Promise<void>;
   execute: (dbName: string, query: string, params?: any[]) => QueryResult;
-  executeAsync: (
-    dbName: string,
-    query: string,
-    params?: any[]
-  ) => Promise<QueryResult>;
+  executeAsync: (dbName: string, query: string, params?: any[]) => Promise<QueryResult>;
   executeBatch: (dbName: string, commands: SQLBatchTuple[]) => BatchQueryResult;
-  executeBatchAsync: (
-    dbName: string,
-    commands: SQLBatchTuple[]
-  ) => Promise<BatchQueryResult>;
+  executeBatchAsync: (dbName: string, commands: SQLBatchTuple[]) => Promise<BatchQueryResult>;
   loadFile: (dbName: string, location: string) => FileLoadResult;
   loadFileAsync: (dbName: string, location: string) => Promise<FileLoadResult>;
 }
 
-const locks: Record<
-  string,
-  { queue: PendingTransaction[]; inProgress: boolean }
-> = {};
+const locks: Record<string, { queue: PendingTransaction[]; inProgress: boolean }> = {};
+const updateCallbacks: Record<string, UpdateCallback> = {};
 
 // Enhance some host functions
 
@@ -176,7 +186,7 @@ const enhanceQueryResult = (result: QueryResult): void => {
     result.rows = {
       _array: [],
       length: 0,
-      item: (idx: number) => result.rows._array[idx],
+      item: (idx: number) => result.rows._array[idx]
     };
   } else {
     result.rows.item = (idx: number) => result.rows._array[idx];
@@ -189,7 +199,7 @@ QuickSQLite.open = (dbName: string, location?: string) => {
 
   locks[dbName] = {
     queue: [],
-    inProgress: false,
+    inProgress: false
   };
 };
 
@@ -200,31 +210,20 @@ QuickSQLite.close = (dbName: string) => {
 };
 
 const _execute = QuickSQLite.execute;
-QuickSQLite.execute = (
-  dbName: string,
-  query: string,
-  params?: any[] | undefined
-): QueryResult => {
+QuickSQLite.execute = (dbName: string, query: string, params?: any[] | undefined): QueryResult => {
   const result = _execute(dbName, query, params);
   enhanceQueryResult(result);
   return result;
 };
 
 const _executeAsync = QuickSQLite.executeAsync;
-QuickSQLite.executeAsync = async (
-  dbName: string,
-  query: string,
-  params?: any[] | undefined
-): Promise<QueryResult> => {
+QuickSQLite.executeAsync = async (dbName: string, query: string, params?: any[] | undefined): Promise<QueryResult> => {
   const res = await _executeAsync(dbName, query, params);
   enhanceQueryResult(res);
   return res;
 };
 
-QuickSQLite.transaction = async (
-  dbName: string,
-  fn: (tx: Transaction) => Promise<void>
-): Promise<void> => {
+QuickSQLite.transaction = async (dbName: string, fn: (tx: Transaction) => Promise<void>): Promise<void> => {
   if (!locks[dbName]) {
     throw Error(`Quick SQLite Error: No lock found on db: ${dbName}`);
   }
@@ -234,40 +233,50 @@ QuickSQLite.transaction = async (
   // Local transaction context object implementation
   const execute = (query: string, params?: any[]): QueryResult => {
     if (isFinalized) {
-      throw Error(
-        `Quick SQLite Error: Cannot execute query on finalized transaction: ${dbName}`
-      );
+      throw Error(`Quick SQLite Error: Cannot execute query on finalized transaction: ${dbName}`);
     }
     return QuickSQLite.execute(dbName, query, params);
   };
 
   const executeAsync = (query: string, params?: any[] | undefined) => {
     if (isFinalized) {
-      throw Error(
-        `Quick SQLite Error: Cannot execute query on finalized transaction: ${dbName}`
-      );
+      throw Error(`Quick SQLite Error: Cannot execute query on finalized transaction: ${dbName}`);
     }
     return QuickSQLite.executeAsync(dbName, query, params);
   };
 
   const commit = () => {
     if (isFinalized) {
-      throw Error(
-        `Quick SQLite Error: Cannot execute commit on finalized transaction: ${dbName}`
-      );
+      throw Error(`Quick SQLite Error: Cannot execute commit on finalized transaction: ${dbName}`);
     }
     const result = QuickSQLite.execute(dbName, 'COMMIT');
     isFinalized = true;
     return result;
   };
 
+  const commitAsync = async () => {
+    if (isFinalized) {
+      throw Error(`Quick SQLite Error: Cannot execute commit on finalized transaction: ${dbName}`);
+    }
+    const result = await QuickSQLite.executeAsync(dbName, 'COMMIT');
+    isFinalized = true;
+    return result;
+  };
+
   const rollback = () => {
     if (isFinalized) {
-      throw Error(
-        `Quick SQLite Error: Cannot execute rollback on finalized transaction: ${dbName}`
-      );
+      throw Error(`Quick SQLite Error: Cannot execute rollback on finalized transaction: ${dbName}`);
     }
     const result = QuickSQLite.execute(dbName, 'ROLLBACK');
+    isFinalized = true;
+    return result;
+  };
+
+  const rollbackAsync = async () => {
+    if (isFinalized) {
+      throw Error(`Quick SQLite Error: Cannot execute rollback on finalized transaction: ${dbName}`);
+    }
+    const result = await QuickSQLite.executeAsync(dbName, 'ROLLBACK');
     isFinalized = true;
     return result;
   };
@@ -278,9 +287,11 @@ QuickSQLite.transaction = async (
 
       await fn({
         commit,
+        commitAsync,
         execute,
         executeAsync,
         rollback,
+        rollbackAsync
       });
 
       if (!isFinalized) {
@@ -307,7 +318,7 @@ QuickSQLite.transaction = async (
     const tx: PendingTransaction = {
       start: () => {
         run().then(resolve).catch(reject);
-      },
+      }
     };
 
     locks[dbName].queue.push(tx);
@@ -365,20 +376,14 @@ export const typeORMDriver = {
           fail: (msg: string) => void
         ) => {
           try {
-            let response = await QuickSQLite.executeAsync(
-              options.name,
-              sql,
-              params
-            );
+            let response = await QuickSQLite.executeAsync(options.name, sql, params);
             enhanceQueryResult(response);
             ok(response);
           } catch (e) {
             fail(e);
           }
         },
-        transaction: (
-          fn: (tx: Transaction) => Promise<void>
-        ): Promise<void> => {
+        transaction: (fn: (tx: Transaction) => Promise<void>): Promise<void> => {
           return QuickSQLite.transaction(options.name, fn);
         },
         close: (ok: any, fail: any) => {
@@ -389,12 +394,7 @@ export const typeORMDriver = {
             fail(e);
           }
         },
-        attach: (
-          dbNameToAttach: string,
-          alias: string,
-          location: string | undefined,
-          callback: () => void
-        ) => {
+        attach: (dbNameToAttach: string, alias: string, location: string | undefined, callback: () => void) => {
           QuickSQLite.attach(options.name, dbNameToAttach, alias, location);
 
           callback();
@@ -403,7 +403,7 @@ export const typeORMDriver = {
           QuickSQLite.detach(options.name, alias);
 
           callback();
-        },
+        }
       };
 
       ok(connection);
@@ -412,7 +412,7 @@ export const typeORMDriver = {
     } catch (e) {
       fail(e);
     }
-  },
+  }
 };
 
 export type QuickSQLiteConnection = {
@@ -427,12 +427,14 @@ export type QuickSQLiteConnection = {
   executeBatchAsync: (commands: SQLBatchTuple[]) => Promise<BatchQueryResult>;
   loadFile: (location: string) => FileLoadResult;
   loadFileAsync: (location: string) => Promise<FileLoadResult>;
+  /**
+   * Note that only one listener can be registered per database connection.
+   * Any new hook registration will override the previous one.
+   */
+  registerUpdateHook(callback: UpdateCallback): void;
 };
 
-export const open = (options: {
-  name: string;
-  location?: string;
-}): QuickSQLiteConnection => {
+export const open = (options: { name: string; location?: string }): QuickSQLiteConnection => {
   QuickSQLite.open(options.name, options.location);
 
   return {
@@ -441,22 +443,17 @@ export const open = (options: {
     attach: (dbNameToAttach: string, alias: string, location?: string) =>
       QuickSQLite.attach(options.name, dbNameToAttach, alias, location),
     detach: (alias: string) => QuickSQLite.detach(options.name, alias),
-    transaction: (fn: (tx: Transaction) => Promise<void> | void) =>
-      QuickSQLite.transaction(options.name, fn),
+    transaction: (fn: (tx: Transaction) => Promise<void> | void) => QuickSQLite.transaction(options.name, fn),
     execute: (query: string, params?: any[] | undefined): QueryResult =>
       QuickSQLite.execute(options.name, query, params),
-    executeAsync: (
-      query: string,
-      params?: any[] | undefined
-    ): Promise<QueryResult> =>
+    executeAsync: (query: string, params?: any[] | undefined): Promise<QueryResult> =>
       QuickSQLite.executeAsync(options.name, query, params),
-    executeBatch: (commands: SQLBatchTuple[]) =>
-      QuickSQLite.executeBatch(options.name, commands),
-    executeBatchAsync: (commands: SQLBatchTuple[]) =>
-      QuickSQLite.executeBatchAsync(options.name, commands),
-    loadFile: (location: string) =>
-      QuickSQLite.loadFile(options.name, location),
-    loadFileAsync: (location: string) =>
-      QuickSQLite.loadFileAsync(options.name, location),
+    executeBatch: (commands: SQLBatchTuple[]) => QuickSQLite.executeBatch(options.name, commands),
+    executeBatchAsync: (commands: SQLBatchTuple[]) => QuickSQLite.executeBatchAsync(options.name, commands),
+    loadFile: (location: string) => QuickSQLite.loadFile(options.name, location),
+    loadFileAsync: (location: string) => QuickSQLite.loadFileAsync(options.name, location),
+    registerUpdateHook: (callback: UpdateCallback) => {
+      updateCallbacks[options.name] = callback;
+    }
   };
 };

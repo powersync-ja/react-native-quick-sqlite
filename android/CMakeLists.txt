@@ -46,6 +46,12 @@ find_package(ReactAndroid REQUIRED CONFIG)
 find_package(fbjni REQUIRED CONFIG)
 find_library(LOG_LIB log)
 
+if(${USE_HERMES})
+  set(JSEXECUTOR_LIB ReactAndroid::hermes_executor)
+else()
+  set(JSEXECUTOR_LIB ReactAndroid::jscexecutor)
+endif()
+
 
 target_link_libraries(
   ${PACKAGE_NAME}
@@ -54,5 +60,7 @@ target_link_libraries(
   ReactAndroid::jsi
   ReactAndroid::turbomodulejsijni
   ReactAndroid::react_nativemodule_core
+  ${JSEXECUTOR_LIB}
   android
+  powersync ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${CMAKE_ANDROID_ARCH_ABI}/libpowersync.so
 )

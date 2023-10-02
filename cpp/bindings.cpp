@@ -9,6 +9,7 @@
 #include <string>
 #include "macros.h"
 #include <iostream>
+#include "sqlite3.h"
 
 using namespace std;
 using namespace facebook;
@@ -16,9 +17,55 @@ using namespace facebook;
 namespace osp {
 string docPathStr;
 std::shared_ptr<react::CallInvoker> invoker;
+jsi::Runtime *runtime;
+
+extern "C" {
+  int sqlite3_powersync_init(sqlite3 *db, char **pzErrMsg,
+                            const sqlite3_api_routines *pApi);
+}
+
+/**
+ * This function loads the PowerSync extension into SQLite
+*/
+int init_powersync_sqlite_plugin() {
+  int result = sqlite3_auto_extension((void (*)(void))&sqlite3_powersync_init);
+  return result;
+}
 
 void clearState() {
-  sqliteCloseAll(); 
+  sqliteCloseAll();
+}
+
+/**
+ * Callback handler for SQLite table updates
+ */
+void
+updateTableHandler(void *voidDBName, int opType, char const *dbName, char const *tableName, sqlite3_int64 rowId)
+{
+  /**
+   * No DB operations should occur when this callback is fired from SQLite.
+   * This function triggers an async invocation to call watch callbacks,
+   * avoiding holding SQLite up.
+   */
+  invoker->invokeAsync([voidDBName, opType, dbName, tableName, rowId]
+     {
+      try {
+        // Sqlite 3 just returns main as the db name is no other DBs are attached
+        auto global = runtime->global();
+        jsi::Function handlerFunction = global.getPropertyAsFunction(*runtime, "triggerUpdateHook");
+
+        std::string actualDBName = std::string((char *)voidDBName);
+        auto jsiDbName = jsi::String::createFromAscii(*runtime, actualDBName);
+        auto jsiTableName = jsi::String::createFromAscii(*runtime, tableName);
+        auto jsiOpType = jsi::Value(opType);
+        auto jsiRowId = jsi::String::createFromAscii(*runtime, std::to_string(rowId));
+        handlerFunction.call(*runtime, move(jsiDbName), move(jsiTableName), move(jsiOpType), move(jsiRowId));
+      } catch (jsi::JSINativeException e) {
+        std::cout << e.what() << std::endl;
+      } catch (...) {
+        std::cout << "Unknown error" << std::endl;
+      } 
+      });
 }
 
 void install(jsi::Runtime &rt, std::shared_ptr<react::CallInvoker> jsCallInvoker, const char *docPath)
@@ -26,8 +73,11 @@ void install(jsi::Runtime &rt, std::shared_ptr<react::CallInvoker> jsCallInvoker
   docPathStr = std::string(docPath);
   auto pool = std::make_shared<ThreadPool>();
   invoker = jsCallInvoker;
+  runtime = &rt;
 
   auto open = HOSTFN("open", 2) {
+    init_powersync_sqlite_plugin();
+
     if (count == 0)
     {
       throw jsi::JSError(rt, "[react-native-quick-sqlite][open] database name is required");
@@ -50,12 +100,16 @@ void install(jsi::Runtime &rt, std::shared_ptr<react::CallInvoker> jsCallInvoker
       tempDocPath = tempDocPath + "/" + args[1].asString(rt).utf8(rt);
     }
 
-    SQLiteOPResult result = sqliteOpenDb(dbName, tempDocPath);
+    sqlite3 *db;
+    SQLiteOPResult result = sqliteOpenDb(dbName, tempDocPath, &db);
 
     if (result.type == SQLiteError)
     {
       throw jsi::JSError(rt, result.errorMessage.c_str());
     }
+
+    // Register for update hooks
+    sqlite3_update_hook(db, updateTableHandler, getDBName(db));
 
     return {};
   });

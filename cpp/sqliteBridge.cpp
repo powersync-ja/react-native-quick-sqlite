@@ -20,6 +20,9 @@
 using namespace std;
 using namespace facebook;
 
+
+
+
 map<string, sqlite3 *> dbMap = map<string, sqlite3 *>();
 
 bool folder_exists(const std::string &foldername)
@@ -80,26 +83,25 @@ string get_db_path(string const dbName, string const docPath)
   return docPath + "/" + dbName;
 }
 
-SQLiteOPResult sqliteOpenDb(string const dbName, string const docPath)
+SQLiteOPResult sqliteOpenDb(string const dbName, string const docPath, sqlite3 **db)
 {
   string dbPath = get_db_path(dbName, docPath);
 
   int sqlOpenFlags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX;
 
-  sqlite3 *db;
   int exit = 0;
-  exit = sqlite3_open_v2(dbPath.c_str(), &db, sqlOpenFlags, nullptr);
+  exit = sqlite3_open_v2(dbPath.c_str(), db, sqlOpenFlags, nullptr);
 
   if (exit != SQLITE_OK)
   {
     return SQLiteOPResult{
       .type = SQLiteError,
-      .errorMessage = sqlite3_errmsg(db)
+      .errorMessage = sqlite3_errmsg(*db)
     };
   }
   else
   {
-    dbMap[dbName] = db;
+    dbMap[dbName] = *db;
   }
 
   return SQLiteOPResult{
@@ -128,6 +130,15 @@ SQLiteOPResult sqliteCloseDb(string const dbName)
   return SQLiteOPResult{
     .type = SQLiteOk,
   };
+}
+
+char* getDBName(sqlite3 *db) {
+  for (auto const& x : dbMap) {
+    if (x.second == db) {
+      return (char*) x.first.c_str();
+    }
+  }
+  return NULL;
 }
 
 void sqliteCloseAll() {
@@ -346,7 +357,7 @@ SQLiteOPResult sqliteExecute(string const dbName, string const &query, vector<Qu
             {
               int blob_size = sqlite3_column_bytes(statement, i);
               const void *blob = sqlite3_column_blob(statement, i);
-              uint8_t *data = new uint8_t[blob_size];
+              uint8_t *data;
               memcpy(data, blob, blob_size);
               row[column_name] = createArrayBufferQuickValue(data, blob_size);
               break;

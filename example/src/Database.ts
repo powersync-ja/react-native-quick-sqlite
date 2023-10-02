@@ -1,5 +1,4 @@
 import { DataSource } from 'typeorm';
-import { typeORMDriver } from 'react-native-quick-sqlite';
 import { Book } from './model/Book';
 import { User } from './model/User';
 // import { Buffer } from 'buffer';
@@ -10,7 +9,7 @@ export async function typeORMInit() {
     type: 'react-native',
     database: 'typeormdb',
     location: '.',
-    driver: typeORMDriver,
+    driver: require('react-native-quick-sqlite'),
     entities: [Book, User],
     synchronize: true,
   });

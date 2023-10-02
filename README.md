@@ -1,3 +1,6 @@
+# Alpha
+This package is currently in an alpha release. Functionality could change dramatically in future releases. Certain functions may be partially implemented or buggy.
+
 ![screenshot](https://raw.githubusercontent.com/margelo/react-native-quick-sqlite/main/header2.png)
 
 <div align="center">
@@ -299,7 +302,7 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     if target.name == "react-native-quick-sqlite" then
       target.build_configurations.each do |config|
-        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'SQLITE_ENABLE_FTS5=1'
+        config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)', '<SQLITE_FLAGS>']
       end
     end
   end

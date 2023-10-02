@@ -1,6 +1,8 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
+    "composite": true,
+    "outDir": "lib",
     "paths": {
       "react-native-quick-sqlite": ["./src/index"]
     },
@@ -18,5 +20,6 @@
     "target": "esnext",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true
-  }
+  },
+  "exclude": ["example"]
 }

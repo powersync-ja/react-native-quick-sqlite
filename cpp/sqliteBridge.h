@@ -9,11 +9,12 @@
 
 #include "JSIHelper.h"
 #include <vector>
+#include <sqlite3.h>
 
 using namespace std;
 using namespace facebook;
 
-SQLiteOPResult sqliteOpenDb(string const dbName, string const docPath);
+SQLiteOPResult sqliteOpenDb(string const dbName, string const docPath, sqlite3 **db);
 
 SQLiteOPResult sqliteCloseDb(string const dbName);
 
@@ -26,5 +27,7 @@ SQLiteOPResult sqliteDetachDb(string const mainDBName, string const alias);
 SQLiteOPResult sqliteExecute(string const dbName, string const &query, vector<QuickValue> *values, vector<map<string, QuickValue>> *result, vector<QuickColumnMetadata> *metadata);
 
 SequelLiteralUpdateResult sqliteExecuteLiteral(string const dbName, string const &query);
+
+char* getDBName(sqlite3 *db);
 
 void sqliteCloseAll();
