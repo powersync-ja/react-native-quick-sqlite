@@ -14,7 +14,9 @@ struct QuickSQLiteBridge : jni::JavaClass<QuickSQLiteBridge> {
     javaClassStatic()->registerNatives(
         {// initialization for JSI
          makeNativeMethod("installNativeJsi",
-                          QuickSQLiteBridge::installNativeJsi)});
+                          QuickSQLiteBridge::installNativeJsi),
+         {"clearStateNativeJsi", "()V", (void*)&QuickSQLiteBridge::clearStateNativeJsi}     
+    });
   }
 
 private:
