@@ -46,4 +46,6 @@ private:
   void doWork();
 };
 
+extern std::shared_ptr<ThreadPool> globalThreadPool;
+
 #endif /* ThreadPool_hpp */

@@ -328,6 +328,41 @@ On iOS, the SQLite database can be placed in an app group, in order to make it a
 
 To use an app group, add the app group ID as the value for the `ReactNativeQuickSQLite_AppGroup` key in your project's `Info.plist` file. You'll also need to configure the app group in your project settings. (Xcode -> Project Settings -> Signing & Capabilities -> Add Capability -> App Groups)
 
+## Concurrent Connections
+
+A database can be opened in concurrent mode. This mode opens multiple readonly connections and a single write connection. Multiple read operations can be executed concurrently while a single read lock/transaction is executed.
+
+ * All operations are asynchronous by default - does not block the main isolate.
+ * Watch a query to automatically re-run on changes to the underlying data.
+ * Concurrent transactions supported by default - one write transaction and many multiple read transactions.
+ * Uses WAL mode for fast writes and running read transactions concurrently with a write transaction.
+
+Open a concurrent connection
+
+```JavaScript
+import {openConcurrent } from '@journeyapps/react-native-quick-sqlite';
+
+/**
+ * @returns  ConcurrentQuickSQLiteConnection
+ */
+const connection = openConcurrent('file.db');
+```
+
+Concurrent connections have following methods:
+
+```TypeScript
+interface ConcurrentQuickSQLiteConnection {
+  close: () => void;
+  execute: (sql: string, args?: any[]) => Promise<QueryResult>;
+  readLock: <T>(callback: (context: LockContext) => Promise<T>, options?: LockOptions) => Promise<T>;
+  readTransaction: <T>(callback: (context: TransactionContext) => Promise<T>, options?: LockOptions) => Promise<T>;
+  writeLock: <T>(callback: (context: LockContext) => Promise<T>, options?: LockOptions) => Promise<T>;
+  writeTransaction: <T>(callback: (context: TransactionContext) => Promise<T>, options?: LockOptions) => Promise<T>;
+  registerUpdateHook: (callback: UpdateCallback) => void;
+}
+```
+
+
 ## Community Discord
 
 [Join the Margelo Community Discord](https://discord.gg/6CSHz2qAvA) to chat about react-native-quick-sqlite or other Margelo libraries.

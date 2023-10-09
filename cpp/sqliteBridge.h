@@ -8,26 +8,48 @@
  */
 
 #include "JSIHelper.h"
-#include <vector>
 #include <sqlite3.h>
+#include <vector>
 
 using namespace std;
 using namespace facebook;
 
-SQLiteOPResult sqliteOpenDb(string const dbName, string const docPath, sqlite3 **db);
+SQLiteOPResult sqliteOpenDb(string const dbName, string const docPath,
+                            sqlite3 **db);
+SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,
+                                   sqlite3 **db, int sqlOpenFlags);
 
 SQLiteOPResult sqliteCloseDb(string const dbName);
 
 SQLiteOPResult sqliteRemoveDb(string const dbName, string const docPath);
 
-SQLiteOPResult sqliteAttachDb(string const mainDBName, string const docPath, string const databaseToAttach, string const alias);
+SQLiteOPResult sqliteAttachDb(string const mainDBName, string const docPath,
+                              string const databaseToAttach,
+                              string const alias);
 
 SQLiteOPResult sqliteDetachDb(string const mainDBName, string const alias);
 
-SQLiteOPResult sqliteExecute(string const dbName, string const &query, vector<QuickValue> *values, vector<map<string, QuickValue>> *result, vector<QuickColumnMetadata> *metadata);
+SQLiteOPResult sqliteExecute(string const dbName, string const &query,
+                             vector<QuickValue> *values,
+                             vector<map<string, QuickValue>> *result,
+                             vector<QuickColumnMetadata> *metadata);
 
-SequelLiteralUpdateResult sqliteExecuteLiteral(string const dbName, string const &query);
+SQLiteOPResult sqliteExecuteWithDB(sqlite3 *db, string const &query,
+                                   vector<QuickValue> *params,
+                                   vector<map<string, QuickValue>> *results,
+                                   vector<QuickColumnMetadata> *metadata);
 
-char* getDBName(sqlite3 *db);
+SequelLiteralUpdateResult sqliteExecuteLiteral(string const dbName,
+                                               string const &query);
+SequelLiteralUpdateResult sqliteExecuteLiteralWithDB(sqlite3 *db,
+                                                     string const &query);
+
+char *getDBName(sqlite3 *db);
 
 void sqliteCloseAll();
+
+// void please(void);
+
+SQLiteOPResult sqliteOpenDBConcurrent(string const dbName,
+                                      string const docPath);
+// SQLiteOPResult sqliteCloseDBConcurrent(string const dbName);

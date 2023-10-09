@@ -51,6 +51,7 @@
   },
   "homepage": "https://github.com/margelo/react-native-quick-sqlite#readme",
   "devDependencies": {
+    "@types/uuid": "3.4.0",
     "react": "18.2.0",
     "react-native": "0.71.0",
     "react-native-builder-bob": "^0.18.2",
@@ -80,5 +81,8 @@
         }
       ]
     ]
+  },
+  "dependencies": {
+    "uuid": "3.4.0"
   }
 }

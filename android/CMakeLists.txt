@@ -32,6 +32,10 @@ add_library(
   ../cpp/sqlbatchexecutor.h
   ../cpp/sqlbatchexecutor.cpp
   ../cpp/macros.h
+  ../cpp/concurrency/ConcurrentSQLIteBridge.cpp
+  ../cpp/concurrency/ConcurrentSQLiteBridge.h
+  ../cpp/concurrency/ConnectionPool.cpp
+  ../cpp/concurrency/ConnectionPool.h
   cpp-adapter.cpp
 )
 

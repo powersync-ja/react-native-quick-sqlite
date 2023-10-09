@@ -6,6 +6,7 @@
 //
 
 #include "ThreadPool.h"
+std::shared_ptr<ThreadPool> globalThreadPool = std::make_shared<ThreadPool>();
 
 ThreadPool::ThreadPool() : done(false)
 {
