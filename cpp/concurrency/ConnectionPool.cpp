@@ -14,7 +14,7 @@ ConnectionPool::ConnectionPool(std::string dbName, std::string docPath,
 
   writeConnection = writeCon;
 
-  // Open the write connection, TODO add correct flags
+  // Open the write connection
   genericSqliteOpenDb(dbName, docPath, &writeConnection.connection,
                       SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE |
                           SQLITE_OPEN_NOMUTEX);
@@ -24,7 +24,6 @@ ConnectionPool::ConnectionPool(std::string dbName, std::string docPath,
     sqlite3 *db;
     genericSqliteOpenDb(dbName, docPath, &db,
                         SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX);
-    // TODO setup pragmas for WAL
     struct ConnectionState readCon;
     readCon.connection = db;
     readCon.currentLockId = EMPTY_LOCK_ID;

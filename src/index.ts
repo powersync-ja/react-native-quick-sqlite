@@ -62,8 +62,6 @@ const _open = QuickSQLite.open;
 QuickSQLite.open = (dbName: string, location?: string) => {
   _open(dbName, location);
 
-  // Always make a lock, even if concurrency is open, this helps prevent the same
-  // DB being opened multiple times (externally)
   locks[dbName] = {
     queue: [],
     inProgress: false

@@ -47,9 +47,3 @@ SequelLiteralUpdateResult sqliteExecuteLiteralWithDB(sqlite3 *db,
 char *getDBName(sqlite3 *db);
 
 void sqliteCloseAll();
-
-// void please(void);
-
-SQLiteOPResult sqliteOpenDBConcurrent(string const dbName,
-                                      string const docPath);
-// SQLiteOPResult sqliteCloseDBConcurrent(string const dbName);

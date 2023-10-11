@@ -36,7 +36,7 @@ struct ConnectionState {
  * single thread, however once a lock is active the connections can be used in a
  * thread pool for async statement executions.
  *
- * Synchronization and callback queueing and executions are managed by the
+ * Synchronization, callback queueing and executions are managed by the
  * JavaScript portion of the library.
  *
  * The general flow is:
