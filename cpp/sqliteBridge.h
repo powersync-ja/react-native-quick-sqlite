@@ -11,39 +11,44 @@
 #include <sqlite3.h>
 #include <vector>
 
-using namespace std;
 using namespace facebook;
 
-SQLiteOPResult sqliteOpenDb(string const dbName, string const docPath,
-                            sqlite3 **db);
-SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,
-                                   sqlite3 **db, int sqlOpenFlags);
+enum ConcurrentLockType {
+  ReadLock,
+  WriteLock,
+};
+
+SQLiteOPResult
+sqliteOpenDb(std::string const dbName, std::string const docPath,
+             void (*contextAvailableCallback)(std::string, ConnectionLockId),
+             void (*updateTableCallback)(void *, int, const char *,
+                                         const char *, sqlite3_int64));
 
 SQLiteOPResult sqliteCloseDb(string const dbName);
 
+void sqliteCloseAll();
+
 SQLiteOPResult sqliteRemoveDb(string const dbName, string const docPath);
+
+/**
+ * Requests a lock context to be queued for a read or write lock
+ */
+SQLiteOPResult sqliteRequestLock(std::string const dbName,
+                                 ConnectionLockId const contextId,
+                                 ConcurrentLockType lockType);
+
+SQLiteOPResult
+sqliteExecuteInContext(std::string dbName, ConnectionLockId const contextId,
+                       std::string const &query,
+                       std::vector<QuickValue> *params,
+                       std::vector<map<std::string, QuickValue>> *results,
+                       std::vector<QuickColumnMetadata> *metadata);
+
+void sqliteReleaseLock(std::string const dbName,
+                       ConnectionLockId const contextId);
 
 SQLiteOPResult sqliteAttachDb(string const mainDBName, string const docPath,
                               string const databaseToAttach,
                               string const alias);
 
 SQLiteOPResult sqliteDetachDb(string const mainDBName, string const alias);
-
-SQLiteOPResult sqliteExecute(string const dbName, string const &query,
-                             vector<QuickValue> *values,
-                             vector<map<string, QuickValue>> *result,
-                             vector<QuickColumnMetadata> *metadata);
-
-SQLiteOPResult sqliteExecuteWithDB(sqlite3 *db, string const &query,
-                                   vector<QuickValue> *params,
-                                   vector<map<string, QuickValue>> *results,
-                                   vector<QuickColumnMetadata> *metadata);
-
-SequelLiteralUpdateResult sqliteExecuteLiteral(string const dbName,
-                                               string const &query);
-SequelLiteralUpdateResult sqliteExecuteLiteralWithDB(sqlite3 *db,
-                                                     string const &query);
-
-char *getDBName(sqlite3 *db);
-
-void sqliteCloseAll();

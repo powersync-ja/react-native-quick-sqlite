@@ -1,5 +1,7 @@
 #include "ConnectionPool.h"
+#include "fileUtils.h"
 #include "sqlite3.h"
+#include "sqliteExecute.h"
 
 ConnectionPool::ConnectionPool(std::string dbName, std::string docPath,
                                unsigned int numReadConnections)
@@ -165,4 +167,21 @@ void ConnectionPool::activateContext(ConnectionState *state,
   if (onContextCallback != nullptr) {
     onContextCallback(dbName, contextId);
   }
+}
+
+SQLiteOPResult ConnectionPool::genericSqliteOpenDb(string const dbName,
+                                                   string const docPath,
+                                                   sqlite3 **db,
+                                                   int sqlOpenFlags) {
+  string dbPath = get_db_path(dbName, docPath);
+
+  int exit = 0;
+  exit = sqlite3_open_v2(dbPath.c_str(), db, sqlOpenFlags, nullptr);
+
+  if (exit != SQLITE_OK) {
+    return SQLiteOPResult{.type = SQLiteError,
+                          .errorMessage = sqlite3_errmsg(*db)};
+  }
+
+  return SQLiteOPResult{.type = SQLiteOk, .rowsAffected = 0};
 }

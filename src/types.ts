@@ -68,25 +68,15 @@ export interface FileLoadResult extends BatchQueryResult {
 }
 
 export interface Transaction {
-  commit: () => QueryResult;
+  // TODO give blocking access in order to use a single thread
+  commit: () => Promise<QueryResult>;
   commitAsync: () => Promise<QueryResult>;
+  // TODO give blocking access in order to use a single thread
   execute: (query: string, params?: any[]) => QueryResult;
   executeAsync: (query: string, params?: any[] | undefined) => Promise<QueryResult>;
+  // TODO give blocking access in order to use a single thread
   rollback: () => QueryResult;
   rollbackAsync: () => Promise<QueryResult>;
-}
-
-export interface PendingTransaction {
-  /*
-   * The start function should not throw or return a promise because the
-   * queue just calls it and does not monitor for failures or completions.
-   *
-   * It should catch any errors and call the resolve or reject of the wrapping
-   * promise when complete.
-   *
-   * It should also automatically commit or rollback the transaction if needed
-   */
-  start: () => void;
 }
 
 export enum RowUpdateType {
@@ -113,44 +103,23 @@ export interface ISQLite {
   open: (dbName: string, location?: string) => void;
   close: (dbName: string) => void;
   delete: (dbName: string, location?: string) => void;
-  attach: (mainDbName: string, dbNameToAttach: string, alias: string, location?: string) => void;
-  detach: (mainDbName: string, alias: string) => void;
-  transaction: (dbName: string, fn: (tx: Transaction) => Promise<void> | void) => Promise<void>;
-  execute: (dbName: string, query: string, params?: any[]) => QueryResult;
-  executeAsync: (dbName: string, query: string, params?: any[]) => Promise<QueryResult>;
-  executeBatch: (dbName: string, commands: SQLBatchTuple[]) => BatchQueryResult;
-  executeBatchAsync: (dbName: string, commands: SQLBatchTuple[]) => Promise<BatchQueryResult>;
-  loadFile: (dbName: string, location: string) => FileLoadResult;
-  loadFileAsync: (dbName: string, location: string) => Promise<FileLoadResult>;
-}
-
-export interface ConcurrentISQLite extends ISQLite {
-  openConcurrent: (dbName: string, location?: string) => void;
-  closeConcurrent: (dbName: string) => void;
 
   executeInContext: (dbName: string, id: ContextLockID, query: string, params: any[]) => Promise<QueryResult>;
   requestConcurrentLock: (dbName: string, id: ContextLockID, type: ConcurrentLockType) => QueryResult;
   releaseConcurrentLock(dbName: string, id: ContextLockID): void;
-}
 
-export type QuickSQLiteConnection = {
-  close: () => void;
-  delete: () => void;
-  attach: (dbNameToAttach: string, alias: string, location?: string) => void;
-  detach: (alias: string) => void;
-  transaction: (fn: (tx: Transaction) => Promise<void> | void) => Promise<void>;
-  execute: (query: string, params?: any[]) => QueryResult;
-  executeAsync: (query: string, params?: any[]) => Promise<QueryResult>;
-  executeBatch: (commands: SQLBatchTuple[]) => BatchQueryResult;
-  executeBatchAsync: (commands: SQLBatchTuple[]) => Promise<BatchQueryResult>;
-  loadFile: (location: string) => FileLoadResult;
-  loadFileAsync: (location: string) => Promise<FileLoadResult>;
-  /**
-   * Note that only one listener can be registered per database connection.
-   * Any new hook registration will override the previous one.
-   */
-  registerUpdateHook(callback: UpdateCallback): void;
-};
+  // TODO
+  attach: (mainDbName: string, dbNameToAttach: string, alias: string, location?: string) => void;
+  detach: (mainDbName: string, alias: string) => void;
+
+  // TODO
+  executeBatch: (dbName: string, commands: SQLBatchTuple[]) => BatchQueryResult;
+  executeBatchAsync: (dbName: string, commands: SQLBatchTuple[]) => Promise<BatchQueryResult>;
+
+  // TODO
+  loadFile: (dbName: string, location: string) => FileLoadResult;
+  loadFileAsync: (dbName: string, location: string) => Promise<FileLoadResult>;
+}
 
 export interface LockOptions {
   timeoutMs?: number;
@@ -165,12 +134,23 @@ export interface TransactionContext extends LockContext {
   rollback: () => Promise<QueryResult>;
 }
 
-export type ConcurrentQuickSQLiteConnection = {
+export type QuickSQLiteConnection = {
   close: () => void;
   execute: (sql: string, args?: any[]) => Promise<QueryResult>;
   readLock: <T>(callback: (context: LockContext) => Promise<T>, options?: LockOptions) => Promise<T>;
   readTransaction: <T>(callback: (context: TransactionContext) => Promise<T>, options?: LockOptions) => Promise<T>;
   writeLock: <T>(callback: (context: LockContext) => Promise<T>, options?: LockOptions) => Promise<T>;
   writeTransaction: <T>(callback: (context: TransactionContext) => Promise<T>, options?: LockOptions) => Promise<T>;
-  registerUpdateHook: (callback: UpdateCallback) => void;
+  delete: () => void;
+  attach: (dbNameToAttach: string, alias: string, location?: string) => void;
+  detach: (alias: string) => void;
+  executeBatch: (commands: SQLBatchTuple[]) => BatchQueryResult;
+  executeBatchAsync: (commands: SQLBatchTuple[]) => Promise<BatchQueryResult>;
+  loadFile: (location: string) => FileLoadResult;
+  loadFileAsync: (location: string) => Promise<FileLoadResult>;
+  /**
+   * Note that only one listener can be registered per database connection.
+   * Any new hook registration will override the previous one.
+   */
+  registerUpdateHook(callback: UpdateCallback): void;
 };

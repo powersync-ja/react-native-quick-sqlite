@@ -8,6 +8,8 @@
  */
 
 #include "sqliteBridge.h"
+#include "ConnectionPool.h"
+#include "fileUtils.h"
 #include "logs.h"
 #include <ctime>
 #include <iostream>
@@ -20,133 +22,119 @@
 using namespace std;
 using namespace facebook;
 
-map<string, sqlite3 *> dbMap = map<string, sqlite3 *>();
+std::map<std::string, ConnectionPool *> concurrentDBMap =
+    std::map<std::string, ConnectionPool *>();
 
-bool folder_exists(const std::string &foldername) {
-  struct stat buffer;
-  return (stat(foldername.c_str(), &buffer) == 0);
-}
-
-/**
- * Portable wrapper for mkdir. Internally used by mkdir()
- * @param[in] path the full path of the directory to create.
- * @return zero on success, otherwise -1.
- */
-int _mkdir(const char *path) {
-#if _POSIX_C_SOURCE
-  return mkdir(path);
-#else
-  return mkdir(path, 0755); // not sure if this works on mac
-#endif
-}
-
-/**
- * Recursive, portable wrapper for mkdir.
- * @param[in] path the full path of the directory to create.
- * @return zero on success, otherwise -1.
- */
-int mkdir(const char *path) {
-  string current_level = "/";
-  string level;
-  stringstream ss(path);
-  // First line is empty because it starts with /User
-  getline(ss, level, '/');
-  // split path using slash as a separator
-  while (getline(ss, level, '/')) {
-    current_level += level; // append folder to the current level
-                            // create current level
-    if (!folder_exists(current_level) && _mkdir(current_level.c_str()) != 0)
-      return -1;
-
-    current_level += "/"; // don't forget to append a slash
-  }
-
-  return 0;
-}
-
-inline bool file_exists(const string &path) {
-  struct stat buffer;
-  return (stat(path.c_str(), &buffer) == 0);
-}
-
-string get_db_path(string const dbName, string const docPath) {
-  mkdir(docPath.c_str());
-  return docPath + "/" + dbName;
+SQLiteOPResult generateNotOpenResult(std::string const &dbName) {
+  return SQLiteOPResult{
+      .type = SQLiteError,
+      .errorMessage = dbName + " is not open",
+  };
 }
 
 /**
  * Opens SQL database with default settings
  */
-SQLiteOPResult sqliteOpenDb(string const dbName, string const docPath,
-                            sqlite3 **db) {
-  int sqlOpenFlags =
-      SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX;
-
-  auto result = genericSqliteOpenDb(dbName, docPath, db, sqlOpenFlags);
-
-  if (result.type != SQLITE_OK) {
-    return SQLiteOPResult{.type = SQLiteError,
-                          .errorMessage = sqlite3_errmsg(*db)};
-  } else {
-    dbMap[dbName] = *db;
-  }
-
-  return result;
-}
-
-SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,
-                                   sqlite3 **db, int sqlOpenFlags) {
-  string dbPath = get_db_path(dbName, docPath);
-
-  int exit = 0;
-  exit = sqlite3_open_v2(dbPath.c_str(), db, sqlOpenFlags, nullptr);
-
-  if (exit != SQLITE_OK) {
-    return SQLiteOPResult{.type = SQLiteError,
-                          .errorMessage = sqlite3_errmsg(*db)};
-  }
-
-  return SQLiteOPResult{.type = SQLiteOk, .rowsAffected = 0};
-}
-
-SQLiteOPResult sqliteCloseDb(string const dbName) {
-
-  if (dbMap.count(dbName) == 0) {
+SQLiteOPResult
+sqliteOpenDb(string const dbName, string const docPath,
+             void (*contextAvailableCallback)(std::string, ConnectionLockId),
+             void (*updateTableCallback)(void *, int, const char *,
+                                         const char *, sqlite3_int64)) {
+  if (concurrentDBMap.count(dbName) == 1) {
     return SQLiteOPResult{
         .type = SQLiteError,
-        .errorMessage = dbName + " is not open",
+        .errorMessage = dbName + " is already open",
     };
   }
 
-  sqlite3 *db = dbMap[dbName];
-
-  sqlite3_close_v2(db);
-
-  dbMap.erase(dbName);
+  concurrentDBMap[dbName] = new ConnectionPool(dbName, docPath);
+  concurrentDBMap[dbName]->setOnContextAvailable(contextAvailableCallback);
+  concurrentDBMap[dbName]->setTableUpdateHandler(updateTableCallback);
 
   return SQLiteOPResult{
       .type = SQLiteOk,
   };
 }
 
-char *getDBName(sqlite3 *db) {
-  for (auto const &x : dbMap) {
-    if (x.second == db) {
-      return (char *)x.first.c_str();
-    }
+SQLiteOPResult sqliteCloseDb(string const dbName) {
+  if (concurrentDBMap.count(dbName) == 0) {
+    return generateNotOpenResult(dbName);
   }
-  return NULL;
+
+  ConnectionPool *connection = concurrentDBMap[dbName];
+
+  connection->closeAll();
+  delete connection;
+  concurrentDBMap.erase(dbName);
+
+  return SQLiteOPResult{
+      .type = SQLiteOk,
+  };
 }
 
 void sqliteCloseAll() {
-  for (auto const &x : dbMap) {
-    // In certain cases, this will return SQLITE_OK, mark the database
-    // connection as an unusable "zombie", and deallocate the connection later.
-    sqlite3_close_v2(x.second);
+  for (auto const &x : concurrentDBMap) {
+    x.second->closeAll();
+    delete x.second;
   }
-  dbMap.clear();
+  concurrentDBMap.clear();
 }
 
+SQLiteOPResult
+sqliteExecuteInContext(std::string dbName, ConnectionLockId const contextId,
+                       std::string const &query,
+                       std::vector<QuickValue> *params,
+                       std::vector<map<string, QuickValue>> *results,
+                       std::vector<QuickColumnMetadata> *metadata) {
+  if (concurrentDBMap.count(dbName) == 0) {
+    return generateNotOpenResult(dbName);
+  }
+
+  ConnectionPool *connection = concurrentDBMap[dbName];
+  return connection->executeInContext(contextId, query, params, results,
+                                      metadata);
+}
+
+void sqliteReleaseLock(std::string const dbName,
+                       ConnectionLockId const contextId) {
+  if (concurrentDBMap.count(dbName) == 0) {
+    // Do nothing if the lock does not actually exist
+    return;
+  }
+
+  ConnectionPool *connection = concurrentDBMap[dbName];
+  connection->closeContext(contextId);
+}
+
+SQLiteOPResult sqliteRequestLock(std::string const dbName,
+                                 ConnectionLockId const contextId,
+                                 ConcurrentLockType lockType) {
+  if (concurrentDBMap.count(dbName) == 0) {
+    return generateNotOpenResult(dbName);
+  }
+
+  ConnectionPool *connection = concurrentDBMap[dbName];
+
+  switch (lockType) {
+  case ConcurrentLockType::ReadLock:
+    connection->readLock(contextId);
+    break;
+  case ConcurrentLockType::WriteLock:
+    connection->writeLock(contextId);
+    break;
+
+  default:
+    break;
+  }
+
+  return SQLiteOPResult{
+      .type = SQLiteOk,
+  };
+}
+
+/**
+ * TODO funnel this though to all connection pool's connections
+ */
 SQLiteOPResult sqliteAttachDb(string const mainDBName, string const docPath,
                               string const databaseToAttach,
                               string const alias) {
@@ -171,6 +159,9 @@ SQLiteOPResult sqliteAttachDb(string const mainDBName, string const docPath,
   };
 }
 
+/**
+ * TODO funnel this though to all connection pool's connections
+ */
 SQLiteOPResult sqliteDetachDb(string const mainDBName, string const alias) {
   /**
    * There is no need to check if mainDBName is opened because
@@ -192,7 +183,7 @@ SQLiteOPResult sqliteDetachDb(string const mainDBName, string const alias) {
 }
 
 SQLiteOPResult sqliteRemoveDb(string const dbName, string const docPath) {
-  if (dbMap.count(dbName) == 1) {
+  if (concurrentDBMap.count(dbName) == 1) {
     SQLiteOPResult closeResult = sqliteCloseDb(dbName);
     if (closeResult.type == SQLiteError) {
       return closeResult;
@@ -213,264 +204,4 @@ SQLiteOPResult sqliteRemoveDb(string const dbName, string const docPath) {
   return SQLiteOPResult{
       .type = SQLiteOk,
   };
-}
-
-void bindStatement(sqlite3_stmt *statement, vector<QuickValue> *values) {
-  size_t size = values->size();
-  if (size <= 0) {
-    return;
-  }
-
-  for (int ii = 0; ii < size; ii++) {
-    int sqIndex = ii + 1;
-    QuickValue value = values->at(ii);
-    QuickDataType dataType = value.dataType;
-    if (dataType == NULL_VALUE) {
-      sqlite3_bind_null(statement, sqIndex);
-    } else if (dataType == BOOLEAN) {
-      sqlite3_bind_int(statement, sqIndex, value.booleanValue);
-    } else if (dataType == INTEGER) {
-      sqlite3_bind_int(statement, sqIndex, (int)value.doubleOrIntValue);
-    } else if (dataType == DOUBLE) {
-      sqlite3_bind_double(statement, sqIndex, value.doubleOrIntValue);
-    } else if (dataType == INT64) {
-      sqlite3_bind_int64(statement, sqIndex, value.int64Value);
-    } else if (dataType == TEXT) {
-      sqlite3_bind_text(statement, sqIndex, value.textValue.c_str(),
-                        value.textValue.length(), SQLITE_TRANSIENT);
-    } else if (dataType == ARRAY_BUFFER) {
-      sqlite3_bind_blob(statement, sqIndex, value.arrayBufferValue.get(),
-                        value.arrayBufferSize, SQLITE_STATIC);
-    }
-  }
-}
-
-SQLiteOPResult sqliteExecute(string const dbName, string const &query,
-                             vector<QuickValue> *params,
-                             vector<map<string, QuickValue>> *results,
-                             vector<QuickColumnMetadata> *metadata) {
-
-  if (dbMap.count(dbName) == 0) {
-    return SQLiteOPResult{.type = SQLiteError,
-                          .errorMessage =
-                              "[react-native-quick-sqlite]: Database " +
-                              dbName + " is not open",
-                          .rowsAffected = 0};
-  }
-
-  sqlite3 *db = dbMap[dbName];
-  return sqliteExecuteWithDB(db, query, params, results, metadata);
-}
-
-SQLiteOPResult sqliteExecuteWithDB(sqlite3 *db, string const &query,
-                                   vector<QuickValue> *params,
-                                   vector<map<string, QuickValue>> *results,
-                                   vector<QuickColumnMetadata> *metadata) {
-  sqlite3_stmt *statement;
-
-  int statementStatus =
-      sqlite3_prepare_v2(db, query.c_str(), -1, &statement, NULL);
-
-  if (statementStatus ==
-      SQLITE_OK) // statemnet is correct, bind the passed parameters
-  {
-    bindStatement(statement, params);
-  } else {
-    const char *message = sqlite3_errmsg(db);
-    return SQLiteOPResult{
-        .type = SQLiteError,
-        .errorMessage = "[react-native-quick-sqlite] SQL execution error: " +
-                        string(message),
-        .rowsAffected = 0};
-  }
-
-  bool isConsuming = true;
-  bool isFailed = false;
-
-  int result, i, count, column_type;
-  string column_name, column_declared_type;
-  map<string, QuickValue> row;
-
-  while (isConsuming) {
-    result = sqlite3_step(statement);
-
-    switch (result) {
-    case SQLITE_ROW:
-      if (results == NULL) {
-        break;
-      }
-
-      i = 0;
-      row = map<string, QuickValue>();
-      count = sqlite3_column_count(statement);
-
-      while (i < count) {
-        column_type = sqlite3_column_type(statement, i);
-        column_name = sqlite3_column_name(statement, i);
-
-        switch (column_type) {
-
-        case SQLITE_INTEGER: {
-          /**
-           * It's not possible to send a int64_t in a jsi::Value because JS
-           * cannot represent the whole number range. Instead, we're sending a
-           * double, which can represent all integers up to 53 bits long, which
-           * is more than what was there before (a 32-bit int).
-           *
-           * See https://github.com/margelo/react-native-quick-sqlite/issues/16
-           * for more context.
-           */
-          double column_value = sqlite3_column_double(statement, i);
-          row[column_name] = createIntegerQuickValue(column_value);
-          break;
-        }
-
-        case SQLITE_FLOAT: {
-          double column_value = sqlite3_column_double(statement, i);
-          row[column_name] = createDoubleQuickValue(column_value);
-          break;
-        }
-
-        case SQLITE_TEXT: {
-          const char *column_value =
-              reinterpret_cast<const char *>(sqlite3_column_text(statement, i));
-          int byteLen = sqlite3_column_bytes(statement, i);
-          // Specify length too; in case string contains NULL in the middle
-          // (which SQLite supports!)
-          row[column_name] =
-              createTextQuickValue(string(column_value, byteLen));
-          break;
-        }
-
-        case SQLITE_BLOB: {
-          int blob_size = sqlite3_column_bytes(statement, i);
-          const void *blob = sqlite3_column_blob(statement, i);
-          uint8_t *data;
-          memcpy(data, blob, blob_size);
-          row[column_name] = createArrayBufferQuickValue(data, blob_size);
-          break;
-        }
-
-        case SQLITE_NULL:
-          // Intentionally left blank to switch to default case
-        default:
-          row[column_name] = createNullQuickValue();
-          break;
-        }
-        i++;
-      }
-      results->push_back(move(row));
-      break;
-    case SQLITE_DONE:
-      if (metadata != NULL) {
-        i = 0;
-        count = sqlite3_column_count(statement);
-        while (i < count) {
-          column_name = sqlite3_column_name(statement, i);
-          const char *tp = sqlite3_column_decltype(statement, i);
-          column_declared_type = tp != NULL ? tp : "UNKNOWN";
-          QuickColumnMetadata meta = {
-              .colunmName = column_name,
-              .columnIndex = i,
-              .columnDeclaredType = column_declared_type,
-          };
-          metadata->push_back(meta);
-          i++;
-        }
-      }
-      isConsuming = false;
-      break;
-
-    default:
-      isFailed = true;
-      isConsuming = false;
-    }
-  }
-
-  sqlite3_finalize(statement);
-
-  if (isFailed) {
-    const char *message = sqlite3_errmsg(db);
-    return SQLiteOPResult{
-        .type = SQLiteError,
-        .errorMessage = "[react-native-quick-sqlite] SQL execution error: " +
-                        string(message),
-        .rowsAffected = 0,
-        .insertId = 0};
-  }
-
-  int changedRowCount = sqlite3_changes(db);
-  long long latestInsertRowId = sqlite3_last_insert_rowid(db);
-  return SQLiteOPResult{.type = SQLiteOk,
-                        .rowsAffected = changedRowCount,
-                        .insertId = static_cast<double>(latestInsertRowId)};
-}
-
-SequelLiteralUpdateResult sqliteExecuteLiteral(string const dbName,
-                                               string const &query) {
-  // Check if db connection is opened
-  if (dbMap.count(dbName) == 0) {
-    return {SQLiteError,
-            "[react-native-quick-sqlite] Database not opened: " + dbName, 0};
-  }
-
-  sqlite3 *db = dbMap[dbName];
-  return sqliteExecuteLiteralWithDB(db, query);
-}
-
-SequelLiteralUpdateResult sqliteExecuteLiteralWithDB(sqlite3 *db,
-                                                     string const &query) {
-  // SQLite statements need to be compiled before executed
-  sqlite3_stmt *statement;
-
-  // Compile and move result into statement memory spot
-  int statementStatus =
-      sqlite3_prepare_v2(db, query.c_str(), -1, &statement, NULL);
-
-  if (statementStatus !=
-      SQLITE_OK) // statemnet is correct, bind the passed parameters
-  {
-    const char *message = sqlite3_errmsg(db);
-    return {SQLiteError,
-            "[react-native-quick-sqlite] SQL execution error: " +
-                string(message),
-            0};
-  }
-
-  bool isConsuming = true;
-  bool isFailed = false;
-
-  int result, i, count, column_type;
-  string column_name;
-
-  while (isConsuming) {
-    result = sqlite3_step(statement);
-
-    switch (result) {
-    case SQLITE_ROW:
-      isConsuming = true;
-      break;
-
-    case SQLITE_DONE:
-      isConsuming = false;
-      break;
-
-    default:
-      isFailed = true;
-      isConsuming = false;
-    }
-  }
-
-  sqlite3_finalize(statement);
-
-  if (isFailed) {
-    const char *message = sqlite3_errmsg(db);
-    return {SQLiteError,
-            "[react-native-quick-sqlite] SQL execution error: " +
-                string(message),
-            0};
-  }
-
-  int changedRowCount = sqlite3_changes(db);
-  return {SQLiteOk, "", changedRowCount};
 }

@@ -1,12 +1,13 @@
 import {
-  ConcurrentISQLite,
+  ISQLite,
   ConcurrentLockType,
-  ConcurrentQuickSQLiteConnection,
+  QuickSQLiteConnection,
   ContextLockID,
   LockContext,
   LockOptions,
   TransactionContext,
-  UpdateCallback
+  UpdateCallback,
+  SQLBatchTuple
 } from './types';
 
 import uuid from 'uuid';
@@ -19,7 +20,7 @@ type LockCallbackRecord = {
 };
 
 const LockCallbacks: Record<ContextLockID, LockCallbackRecord> = {};
-let proxy: ConcurrentISQLite;
+let proxy: ISQLite;
 
 /**
  * Closes the context in JS and C++
@@ -66,14 +67,14 @@ global.onLockContextIsAvailable = async (dbName: string, lockId: ContextLockID) 
  * @param proxy
  * @returns
  */
-export function setupConcurrency(QuickSQLite: ConcurrentISQLite) {
+export function setupConcurrency(QuickSQLite: ISQLite) {
   // Allow the Global callbacks to close lock contexts
   proxy = QuickSQLite;
 
   return {
-    openConcurrent: (dbName: string, location?: string): ConcurrentQuickSQLiteConnection => {
+    openConcurrent: (dbName: string, location?: string): QuickSQLiteConnection => {
       // Opens the connection
-      QuickSQLite.openConcurrent(dbName, location);
+      QuickSQLite.open(dbName, location);
 
       /**
        * Wraps lock requests and their callbacks in order to resolve the lock
@@ -174,7 +175,7 @@ export function setupConcurrency(QuickSQLite: ConcurrentISQLite) {
 
       // Return the concurrent connection object
       return {
-        close: () => QuickSQLite.closeConcurrent(dbName),
+        close: () => QuickSQLite.close(dbName),
         execute: (sql: string, args?: any[]) => writeLock((context) => context.execute(sql, args)),
         readLock,
         readTransaction: async <T>(callback: (context: TransactionContext) => Promise<T>, options?: LockOptions) =>
@@ -184,7 +185,15 @@ export function setupConcurrency(QuickSQLite: ConcurrentISQLite) {
           writeLock((context) => wrapTransaction(context, callback), options),
         registerUpdateHook: (callback: UpdateCallback) => {
           registerUpdateHook(dbName, callback);
-        }
+        },
+        // TODO
+        attach: (dbNameToAttach: string, alias: string, location?: string) => {},
+        detach: (alias: string) => {},
+        delete: () => {},
+        executeBatch: (commands: SQLBatchTuple[]) => {},
+        executeBatchAsync: (commands: SQLBatchTuple[]) => {},
+        loadFile: (location: string) => {},
+        loadFileAsync: (location: string) => {}
       };
     }
   };

@@ -123,6 +123,9 @@ public:
 
 private:
   void activateContext(ConnectionState *state, ConnectionLockId contextId);
+
+  SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,
+                                     sqlite3 **db, int sqlOpenFlags);
 };
 
 #endif
