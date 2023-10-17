@@ -25,17 +25,17 @@ add_library(
   ../cpp/sqlite3.c
   ../cpp/JSIHelper.h
   ../cpp/JSIHelper.cpp
+  ../cpp/fileUtils.h
+  ../cpp/fileUtils.cpp
+  ../cpp/sqliteExecute.h
+  ../cpp/sqliteExecute.cpp
   ../cpp/ThreadPool.h
   ../cpp/ThreadPool.cpp
-  ../cpp/sqlfileloader.h
-  ../cpp/sqlfileloader.cpp
   ../cpp/sqlbatchexecutor.h
   ../cpp/sqlbatchexecutor.cpp
   ../cpp/macros.h
-  ../cpp/concurrency/ConcurrentSQLIteBridge.cpp
-  ../cpp/concurrency/ConcurrentSQLiteBridge.h
-  ../cpp/concurrency/ConnectionPool.cpp
-  ../cpp/concurrency/ConnectionPool.h
+  ../cpp/ConnectionPool.cpp
+  ../cpp/ConnectionPool.h
   cpp-adapter.cpp
 )
 

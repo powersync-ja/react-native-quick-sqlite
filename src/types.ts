@@ -67,18 +67,6 @@ export interface FileLoadResult extends BatchQueryResult {
   commands?: number;
 }
 
-export interface Transaction {
-  // TODO give blocking access in order to use a single thread
-  commit: () => Promise<QueryResult>;
-  commitAsync: () => Promise<QueryResult>;
-  // TODO give blocking access in order to use a single thread
-  execute: (query: string, params?: any[]) => QueryResult;
-  executeAsync: (query: string, params?: any[] | undefined) => Promise<QueryResult>;
-  // TODO give blocking access in order to use a single thread
-  rollback: () => QueryResult;
-  rollbackAsync: () => Promise<QueryResult>;
-}
-
 export enum RowUpdateType {
   SQLITE_INSERT = 18,
   SQLITE_DELETE = 9,
@@ -104,20 +92,15 @@ export interface ISQLite {
   close: (dbName: string) => void;
   delete: (dbName: string, location?: string) => void;
 
-  executeInContext: (dbName: string, id: ContextLockID, query: string, params: any[]) => Promise<QueryResult>;
-  requestConcurrentLock: (dbName: string, id: ContextLockID, type: ConcurrentLockType) => QueryResult;
-  releaseConcurrentLock(dbName: string, id: ContextLockID): void;
+  requestLock: (dbName: string, id: ContextLockID, type: ConcurrentLockType) => QueryResult;
+  releaseLock(dbName: string, id: ContextLockID): void;
+  executeInContext: (dbName: string, id: ContextLockID, query: string, params: any[]) => QueryResult;
+  executeInContextAsync: (dbName: string, id: ContextLockID, query: string, params: any[]) => Promise<QueryResult>;
 
-  // TODO
   attach: (mainDbName: string, dbNameToAttach: string, alias: string, location?: string) => void;
   detach: (mainDbName: string, alias: string) => void;
 
-  // TODO
-  executeBatch: (dbName: string, commands: SQLBatchTuple[]) => BatchQueryResult;
-  executeBatchAsync: (dbName: string, commands: SQLBatchTuple[]) => Promise<BatchQueryResult>;
-
-  // TODO
-  loadFile: (dbName: string, location: string) => FileLoadResult;
+  executeBatchAsync: (dbName: string, commands: SQLBatchTuple[], id: ContextLockID) => Promise<BatchQueryResult>;
   loadFileAsync: (dbName: string, location: string) => Promise<FileLoadResult>;
 }
 
@@ -126,12 +109,15 @@ export interface LockOptions {
 }
 
 export interface LockContext {
-  execute: (sql: string, args?: any[]) => Promise<QueryResult>;
+  execute: (sql: string, args?: any[]) => QueryResult;
+  executeAsync: (sql: string, args?: any[]) => Promise<QueryResult>;
 }
 
 export interface TransactionContext extends LockContext {
-  commit: () => Promise<QueryResult>;
-  rollback: () => Promise<QueryResult>;
+  commit: () => QueryResult;
+  commitAsync: () => Promise<QueryResult>;
+  rollback: () => QueryResult;
+  rollbackAsync: () => Promise<QueryResult>;
 }
 
 export type QuickSQLiteConnection = {
@@ -144,9 +130,7 @@ export type QuickSQLiteConnection = {
   delete: () => void;
   attach: (dbNameToAttach: string, alias: string, location?: string) => void;
   detach: (alias: string) => void;
-  executeBatch: (commands: SQLBatchTuple[]) => BatchQueryResult;
   executeBatchAsync: (commands: SQLBatchTuple[]) => Promise<BatchQueryResult>;
-  loadFile: (location: string) => FileLoadResult;
   loadFileAsync: (location: string) => Promise<FileLoadResult>;
   /**
    * Note that only one listener can be registered per database connection.
@@ -154,3 +138,4 @@ export type QuickSQLiteConnection = {
    */
   registerUpdateHook(callback: UpdateCallback): void;
 };
+export type Open = (dbName: string, location?: string) => QuickSQLiteConnection;

@@ -7,9 +7,13 @@
  * This code is licensed under the MIT license
  */
 
+#include "ConnectionPool.h"
 #include "JSIHelper.h"
 #include <sqlite3.h>
 #include <vector>
+
+#ifndef SQLiteBridge_h
+#define SQLiteBridge_h
 
 using namespace facebook;
 
@@ -44,6 +48,11 @@ sqliteExecuteInContext(std::string dbName, ConnectionLockId const contextId,
                        std::vector<map<std::string, QuickValue>> *results,
                        std::vector<QuickColumnMetadata> *metadata);
 
+SequelLiteralUpdateResult
+sqliteExecuteLiteralInContext(std::string dbName,
+                              ConnectionLockId const contextId,
+                              std::string const &query);
+
 void sqliteReleaseLock(std::string const dbName,
                        ConnectionLockId const contextId);
 
@@ -52,3 +61,8 @@ SQLiteOPResult sqliteAttachDb(string const mainDBName, string const docPath,
                               string const alias);
 
 SQLiteOPResult sqliteDetachDb(string const mainDBName, string const alias);
+
+SequelBatchOperationResult sqliteImportFile(string const dbName,
+                                            string const fileLocation);
+
+#endif

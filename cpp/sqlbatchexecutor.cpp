@@ -45,7 +45,8 @@ void jsiBatchParametersToQuickArguments(jsi::Runtime &rt,
 }
 
 SequelBatchOperationResult
-sqliteExecuteBatch(std::string dbName, vector<QuickQueryArguments> *commands) {
+sqliteExecuteBatch(std::string dbName, ConnectionLockId lockId,
+                   vector<QuickQueryArguments> *commands) {
   size_t commandCount = commands->size();
   if (commandCount <= 0) {
     return SequelBatchOperationResult{
@@ -56,15 +57,18 @@ sqliteExecuteBatch(std::string dbName, vector<QuickQueryArguments> *commands) {
 
   try {
     int affectedRows = 0;
-    sqliteExecuteLiteral(dbName, "BEGIN EXCLUSIVE TRANSACTION");
+
+    sqliteExecuteLiteralInContext(dbName, lockId,
+                                  "BEGIN EXCLUSIVE TRANSACTION");
+
     for (int i = 0; i < commandCount; i++) {
       auto command = commands->at(i);
       // We do not provide a datastructure to receive query data because we
       // don't need/want to handle this results in a batch execution
-      auto result =
-          sqliteExecute(dbName, command.sql, command.params.get(), NULL, NULL);
+      auto result = sqliteExecuteInContext(dbName, lockId, command.sql,
+                                           command.params.get(), NULL, NULL);
       if (result.type == SQLiteError) {
-        sqliteExecuteLiteral(dbName, "ROLLBACK");
+        sqliteExecuteLiteralInContext(dbName, lockId, "ROLLBACK");
         return SequelBatchOperationResult{
             .type = SQLiteError,
             .message = result.errorMessage,
@@ -73,14 +77,14 @@ sqliteExecuteBatch(std::string dbName, vector<QuickQueryArguments> *commands) {
         affectedRows += result.rowsAffected;
       }
     }
-    sqliteExecuteLiteral(dbName, "COMMIT");
+    sqliteExecuteLiteralInContext(dbName, lockId, "COMMIT");
     return SequelBatchOperationResult{
         .type = SQLiteOk,
         .affectedRows = affectedRows,
         .commands = (int)commandCount,
     };
   } catch (std::exception &exc) {
-    sqliteExecuteLiteral(dbName, "ROLLBACK");
+    sqliteExecuteLiteralInContext(dbName, lockId, "ROLLBACK");
     return SequelBatchOperationResult{
         .type = SQLiteError,
         .message = exc.what(),

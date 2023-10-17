@@ -16,6 +16,6 @@ int _mkdir(const char *path);
  */
 int mkdir(const char *path);
 
-inline bool file_exists(const std::string &path);
+bool file_exists(const std::string &path);
 
 std::string get_db_path(std::string const dbName, std::string const docPath);

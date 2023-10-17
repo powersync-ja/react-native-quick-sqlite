@@ -1,7 +1,10 @@
 #include "ConnectionPool.h"
 #include "fileUtils.h"
 #include "sqlite3.h"
+#include "sqliteBridge.h"
 #include "sqliteExecute.h"
+#include <fstream>
+#include <iostream>
 
 ConnectionPool::ConnectionPool(std::string dbName, std::string docPath,
                                unsigned int numReadConnections)
@@ -111,6 +114,32 @@ SQLiteOPResult ConnectionPool::executeInContext(
   return sqliteExecuteWithDB(db, query, params, results, metadata);
 }
 
+SequelLiteralUpdateResult
+ConnectionPool::executeLiteralInContext(ConnectionLockId contextId,
+                                        string const &query) {
+  sqlite3 *db = nullptr;
+  if (writeConnection.currentLockId == contextId) {
+    db = writeConnection.connection;
+  } else {
+    // Check if it's a read connection
+    for (int i = 0; i < maxReads; i++) {
+      if (readConnections[i].currentLockId == contextId) {
+        db = readConnections[i].connection;
+        break;
+      }
+    }
+  }
+  if (db == nullptr) {
+    // throw error that context is not available
+    return SequelLiteralUpdateResult{
+        .message = "Context is no longer available",
+        .type = SQLiteError,
+    };
+  }
+
+  return sqliteExecuteLiteralWithDB(db, query);
+}
+
 void ConnectionPool::setOnContextAvailable(void (*callback)(std::string,
                                                             ConnectionLockId)) {
   onContextCallback = callback;
@@ -158,7 +187,115 @@ void ConnectionPool::closeAll() {
   }
 }
 
+SQLiteOPResult ConnectionPool::attachDatabase(std::string const dbFileName,
+                                              std::string const docPath,
+                                              std::string const alias) {
+
+  /**
+   * There is no need to check if mainDBName is opened because
+   * sqliteExecuteLiteral will do that.
+   * */
+  string dbPath = get_db_path(dbFileName, docPath);
+  string statement = "ATTACH DATABASE '" + dbPath + "' AS " + alias;
+
+  auto dbConnections = getAllConnections();
+
+  for (auto &connection : dbConnections) {
+    SequelLiteralUpdateResult result =
+        sqliteExecuteLiteralWithDB(connection, statement);
+    if (result.type == SQLiteError) {
+      // Revert change on any successful connections
+      detachDatabase(alias);
+      return SQLiteOPResult{
+          .type = SQLiteError,
+          .errorMessage = dbName + " was unable to attach another database: " +
+                          string(result.message),
+      };
+    }
+  }
+
+  return SQLiteOPResult{
+      .type = SQLiteOk,
+  };
+}
+
+SQLiteOPResult ConnectionPool::detachDatabase(std::string const alias) {
+  /**
+   * There is no need to check if mainDBName is opened because
+   * sqliteExecuteLiteral will do that.
+   * */
+  string statement = "DETACH DATABASE " + alias;
+  auto dbConnections = getAllConnections();
+
+  for (auto &connection : dbConnections) {
+    SequelLiteralUpdateResult result =
+        sqliteExecuteLiteralWithDB(connection, statement);
+    if (result.type == SQLiteError) {
+      return SQLiteOPResult{
+          .type = SQLiteError,
+          .errorMessage = dbName + " was unable to attach another database: " +
+                          string(result.message),
+      };
+    }
+  }
+  return SQLiteOPResult{
+      .type = SQLiteOk,
+  };
+}
+
+SequelBatchOperationResult
+ConnectionPool::importSQLFile(std::string fileLocation) {
+  std::string line;
+  std::ifstream sqFile(fileLocation);
+
+  if (sqFile.is_open()) {
+    sqlite3 *connection = writeConnection.connection;
+    try {
+      int affectedRows = 0;
+      int commands = 0;
+      sqliteExecuteLiteralWithDB(connection, "BEGIN EXCLUSIVE TRANSACTION");
+      while (std::getline(sqFile, line, '\n')) {
+        if (!line.empty()) {
+          SequelLiteralUpdateResult result =
+              sqliteExecuteLiteralWithDB(connection, line);
+          if (result.type == SQLiteError) {
+            sqliteExecuteLiteralWithDB(connection, "ROLLBACK");
+            sqFile.close();
+            return {SQLiteError, result.message, 0, commands};
+          } else {
+            affectedRows += result.affectedRows;
+            commands++;
+          }
+        }
+      }
+      sqFile.close();
+      sqliteExecuteLiteralWithDB(connection, "COMMIT");
+      return {SQLiteOk, "", affectedRows, commands};
+    } catch (...) {
+      sqFile.close();
+      sqliteExecuteLiteralWithDB(connection, "ROLLBACK");
+      return {SQLiteError,
+              "[react-native-quick-sqlite][loadSQLFile] Unexpected error, "
+              "transaction was rolledback",
+              0, 0};
+    }
+  } else {
+    return {SQLiteError,
+            "[react-native-quick-sqlite][loadSQLFile] Could not open file", 0,
+            0};
+  }
+}
+
 // ===================== Private ===============
+
+std::vector<sqlite3 *> ConnectionPool::getAllConnections() {
+  std::vector<sqlite3 *> result;
+  result.push_back(writeConnection.connection);
+  for (int i = 0; i < maxReads; i++) {
+    result.push_back(readConnections[i].connection);
+  }
+  return result;
+}
 
 void ConnectionPool::activateContext(ConnectionState *state,
                                      ConnectionLockId contextId) {

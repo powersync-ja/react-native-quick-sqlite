@@ -4,7 +4,6 @@
 #include "logs.h"
 #include "macros.h"
 #include "sqlbatchexecutor.h"
-#include "sqlfileloader.h"
 #include "sqlite3.h"
 #include "sqliteBridge.h"
 #include <iostream>
@@ -135,7 +134,6 @@ void install(jsi::Runtime &rt,
     return {};
   });
 
-  // TODO
   auto attach = HOSTFN("attach", 4) {
     if (count < 3) {
       throw jsi::JSError(
@@ -157,7 +155,6 @@ void install(jsi::Runtime &rt,
 
       tempDocPath = tempDocPath + "/" + args[3].asString(rt).utf8(rt);
     }
-
     string dbName = args[0].asString(rt).utf8(rt);
     string databaseToAttach = args[1].asString(rt).utf8(rt);
     string alias = args[2].asString(rt).utf8(rt);
@@ -171,7 +168,6 @@ void install(jsi::Runtime &rt,
     return {};
   });
 
-  // TODO
   auto detach = HOSTFN("detach", 2) {
     if (count < 2) {
       throw jsi::JSError(
@@ -250,10 +246,11 @@ void install(jsi::Runtime &rt,
     return {};
   });
 
-  auto executeInContext = HOSTFN("executeInContext", 3) {
+  auto executeInContextAsync = HOSTFN("executeInContextAsync", 3) {
     if (count < 4) {
-      throw jsi::JSError(rt, "[react-native-quick-sqlite][executeInContext] "
-                             "Incorrect arguments for executeInContext");
+      throw jsi::JSError(rt,
+                         "[react-native-quick-sqlite][executeInContextAsync] "
+                         "Incorrect arguments for executeInContextAsync");
     }
 
     const string dbName = args[0].asString(rt).utf8(rt);
@@ -310,9 +307,61 @@ void install(jsi::Runtime &rt,
     return promise;
   });
 
-  // TODO do this only in a context
+  auto executeInContext = HOSTFN("executeInContext", 3) {
+    if (count < 4) {
+      throw jsi::JSError(rt, "[react-native-quick-sqlite][executeInContext] "
+                             "Incorrect arguments for executeInContext");
+    }
+
+    const string dbName = args[0].asString(rt).utf8(rt);
+    const string contextLockId = args[1].asString(rt).utf8(rt);
+    const string query = args[2].asString(rt).utf8(rt);
+    const jsi::Value &originalParams = args[3];
+
+    // Converting query parameters inside the javascript caller thread
+    vector<QuickValue> params;
+    jsiQueryArgumentsToSequelParam(rt, originalParams, &params);
+
+    auto promiseCtr = rt.global().getPropertyAsFunction(rt, "Promise");
+    auto promise = promiseCtr.callAsConstructor(rt, HOSTFN("executor", 2) {
+      auto resolve = std::make_shared<jsi::Value>(rt, args[0]);
+      auto reject = std::make_shared<jsi::Value>(rt, args[1]);
+
+      try {
+        vector<map<string, QuickValue>> results;
+        vector<QuickColumnMetadata> metadata;
+        auto status = sqliteExecuteInContext(
+            dbName, contextLockId, query,
+            make_shared<vector<QuickValue>>(params).get(), &results, &metadata);
+        invoker->invokeAsync(
+            [&rt,
+             results = make_shared<vector<map<string, QuickValue>>>(results),
+             metadata = make_shared<vector<QuickColumnMetadata>>(metadata),
+             status_copy = move(status), resolve, reject] {
+              if (status_copy.type == SQLiteOk) {
+                auto jsiResult = createSequelQueryExecutionResult(
+                    rt, status_copy, results.get(), metadata.get());
+                resolve->asObject(rt).asFunction(rt).call(rt, move(jsiResult));
+              } else {
+                auto errorCtr = rt.global().getPropertyAsFunction(rt, "Error");
+                auto error = errorCtr.callAsConstructor(
+                    rt,
+                    jsi::String::createFromUtf8(rt, status_copy.errorMessage));
+                reject->asObject(rt).asFunction(rt).call(rt, error);
+              }
+            });
+      } catch (std::exception &exc) {
+        invoker->invokeAsync([&rt, &exc] { jsi::JSError(rt, exc.what()); });
+      }
+
+      return {};
+    }));
+
+    return promise;
+  });
+
   auto executeBatchAsync = HOSTFN("executeBatchAsync", 2) {
-    if (sizeof(args) < 2) {
+    if (sizeof(args) < 3) {
       throw jsi::JSError(rt, "[react-native-quick-sqlite][executeAsyncBatch] "
                              "Incorrect parameter count");
       return {};
@@ -329,6 +378,7 @@ void install(jsi::Runtime &rt,
 
     const string dbName = args[0].asString(rt).utf8(rt);
     const jsi::Array &batchParams = params.asObject(rt).asArray(rt);
+    const string contextLockId = args[2].asString(rt).utf8(rt);
 
     vector<QuickQueryArguments> commands;
     jsiBatchParametersToQuickArguments(rt, batchParams, &commands);
@@ -341,10 +391,11 @@ void install(jsi::Runtime &rt,
       auto task = [&rt, dbName,
                    commands =
                        make_shared<vector<QuickQueryArguments>>(commands),
-                   resolve, reject]() {
+                   resolve, reject, contextLockId]() {
         try {
           // Inside the new worker thread, we can now call sqlite operations
-          auto batchResult = sqliteExecuteBatch(dbName, commands.get());
+          auto batchResult =
+              sqliteExecuteBatch(dbName, contextLockId, commands.get());
           invoker->invokeAsync(
               [&rt, batchResult = move(batchResult), resolve, reject] {
                 if (batchResult.type == SQLiteOk) {
@@ -369,23 +420,6 @@ void install(jsi::Runtime &rt,
     return promise;
   });
 
-  auto loadFile = HOSTFN("loadFile", 2) {
-    const string dbName = args[0].asString(rt).utf8(rt);
-    const string sqlFileName = args[1].asString(rt).utf8(rt);
-
-    const auto importResult = importSQLFile(dbName, sqlFileName);
-    if (importResult.type == SQLiteOk) {
-      auto res = jsi::Object(rt);
-      res.setProperty(rt, "rowsAffected",
-                      jsi::Value(importResult.affectedRows));
-      res.setProperty(rt, "commands", jsi::Value(importResult.commands));
-      return move(res);
-    } else {
-      throw jsi::JSError(
-          rt, "[react-native-quick-sqlite][loadFile] Could not open file");
-    }
-  });
-
   // Load SQL File from disk in another thread
   auto loadFileAsync = HOSTFN("loadFileAsync", 2) {
     if (sizeof(args) < 2) {
@@ -404,7 +438,7 @@ void install(jsi::Runtime &rt,
 
       auto task = [&rt, dbName, sqlFileName, resolve, reject]() {
         try {
-          const auto importResult = importSQLFile(dbName, sqlFileName);
+          const auto importResult = sqliteImportFile(dbName, sqlFileName);
 
           invoker->invokeAsync(
               [&rt, result = move(importResult), resolve, reject] {
@@ -434,14 +468,13 @@ void install(jsi::Runtime &rt,
   auto requestLock = HOSTFN("requestLock", 3) {
     if (count < 3) {
       throw jsi::JSError(rt,
-                         "[react-native-quick-sqlite][requestConcurrentLock] "
+                         "[react-native-quick-sqlite][requestLock] "
                          "database name, lock ID and lock type are required");
     }
 
     if (!args[0].isString() || !args[1].isString() || !args[2].isNumber()) {
-      throw jsi::JSError(rt,
-                         "[react-native-quick-sqlite][requestConcurrentLock] "
-                         "invalid argument types received");
+      throw jsi::JSError(rt, "[react-native-quick-sqlite][requestLock] "
+                             "invalid argument types received");
     }
 
     string dbName = args[0].asString(rt).utf8(rt);
@@ -457,15 +490,13 @@ void install(jsi::Runtime &rt,
 
   auto releaseLock = HOSTFN("releaseLock", 3) {
     if (count < 2) {
-      throw jsi::JSError(rt,
-                         "[react-native-quick-sqlite][requestConcurrentLock] "
-                         "database name and lock ID  are required");
+      throw jsi::JSError(rt, "[react-native-quick-sqlite][requestLock] "
+                             "database name and lock ID  are required");
     }
 
     if (!args[0].isString() || !args[1].isString()) {
-      throw jsi::JSError(rt,
-                         "[react-native-quick-sqlite][requestConcurrentLock] "
-                         "invalid argument types received");
+      throw jsi::JSError(rt, "[react-native-quick-sqlite][requestLock] "
+                             "invalid argument types received");
     }
 
     string dbName = args[0].asString(rt).utf8(rt);
@@ -481,19 +512,14 @@ void install(jsi::Runtime &rt,
   module.setProperty(rt, "open", move(open));
   module.setProperty(rt, "requestLock", move(requestLock));
   module.setProperty(rt, "releaseLock", move(releaseLock));
+  module.setProperty(rt, "executeInContextAsync", move(executeInContextAsync));
   module.setProperty(rt, "executeInContext", move(executeInContext));
   module.setProperty(rt, "close", move(close));
 
-  // TODO
   module.setProperty(rt, "attach", move(attach));
-  // TODO
   module.setProperty(rt, "detach", move(detach));
   module.setProperty(rt, "delete", move(remove));
-  // TODO
   module.setProperty(rt, "executeBatchAsync", move(executeBatchAsync));
-  // TODO
-  module.setProperty(rt, "loadFile", move(loadFile));
-  // TODO
   module.setProperty(rt, "loadFileAsync", move(loadFileAsync));
 
   rt.global().setProperty(rt, "__QuickSQLiteProxy", move(module));

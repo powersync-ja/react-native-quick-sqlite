@@ -29,7 +29,7 @@ function closeContextLock(dbName: string, id: ContextLockID) {
   delete LockCallbacks[id];
 
   // This is configured by the setupConcurrency function
-  proxy.releaseConcurrentLock(dbName, id);
+  proxy.releaseLock(dbName, id);
 }
 
 /**
@@ -47,8 +47,15 @@ global.onLockContextIsAvailable = async (dbName: string, lockId: ContextLockID) 
         clearTimeout(record.timeout);
       }
       await record?.callback({
-        execute: async (sql: string, args?: any[]) => {
-          const result = await proxy.executeInContext(dbName, lockId, sql, args);
+        // @ts-expect-error This is not part of the public interface, but is used internally
+        _contextId: lockId,
+        execute: (sql: string, args?: any[]) => {
+          const result = proxy.executeInContext(dbName, lockId, sql, args);
+          enhanceQueryResult(result);
+          return result;
+        },
+        executeAsync: async (sql: string, args?: any[]) => {
+          const result = await proxy.executeInContextAsync(dbName, lockId, sql, args);
           enhanceQueryResult(result);
           return result;
         }
@@ -67,12 +74,12 @@ global.onLockContextIsAvailable = async (dbName: string, lockId: ContextLockID) 
  * @param proxy
  * @returns
  */
-export function setupConcurrency(QuickSQLite: ISQLite) {
+export function setupOpen(QuickSQLite: ISQLite) {
   // Allow the Global callbacks to close lock contexts
   proxy = QuickSQLite;
 
   return {
-    openConcurrent: (dbName: string, location?: string): QuickSQLiteConnection => {
+    open: (dbName: string, location?: string): QuickSQLiteConnection => {
       // Opens the connection
       QuickSQLite.open(dbName, location);
 
@@ -108,7 +115,7 @@ export function setupConcurrency(QuickSQLite: ISQLite) {
         } as LockCallbackRecord);
 
         try {
-          QuickSQLite.requestConcurrentLock(dbName, id, type);
+          QuickSQLite.requestLock(dbName, id, type);
           const timeout = options?.timeoutMs;
           if (timeout) {
             record.timeout = setTimeout(() => {
@@ -137,38 +144,38 @@ export function setupConcurrency(QuickSQLite: ISQLite) {
         callback: (context: TransactionContext) => Promise<T>,
         defaultFinally: 'commit' | 'rollback' = 'commit'
       ) => {
-        await context.execute('BEGIN TRANSACTION');
+        await context.executeAsync('BEGIN TRANSACTION');
         let finalized = false;
 
-        const commit = async () => {
-          if (finalized) {
-            return;
-          }
-          finalized = true;
-          return context.execute('COMMIT');
-        };
+        const finalizedStatement =
+          <T>(action: () => T): (() => T) =>
+          () => {
+            if (finalized) {
+              return;
+            }
+            finalized = true;
+            return action();
+          };
 
-        const rollback = async () => {
-          if (finalized) {
-            return;
-          }
-          finalized = true;
-          return context.execute('ROLLBACK');
-        };
+        const commit = finalizedStatement(() => context.execute('COMMIT'));
+        const commitAsync = finalizedStatement(() => context.executeAsync('COMMIT'));
+
+        const rollback = finalizedStatement(() => context.execute('ROLLBACK'));
+        const rollbackAsync = finalizedStatement(() => context.executeAsync('ROLLBACK'));
 
         try {
-          const res = await callback({ ...context, commit, rollback });
+          const res = await callback({ ...context, commit, commitAsync, rollback, rollbackAsync });
           switch (defaultFinally) {
             case 'commit':
-              await commit();
+              await commitAsync();
               break;
             case 'rollback':
-              await rollback();
+              await rollbackAsync();
               break;
           }
           return res;
         } catch (ex) {
-          await rollback();
+          await rollbackAsync();
           throw ex;
         }
       };
@@ -176,7 +183,7 @@ export function setupConcurrency(QuickSQLite: ISQLite) {
       // Return the concurrent connection object
       return {
         close: () => QuickSQLite.close(dbName),
-        execute: (sql: string, args?: any[]) => writeLock((context) => context.execute(sql, args)),
+        execute: (sql: string, args?: any[]) => writeLock((context) => context.executeAsync(sql, args)),
         readLock,
         readTransaction: async <T>(callback: (context: TransactionContext) => Promise<T>, options?: LockOptions) =>
           readLock((context) => wrapTransaction(context, callback)),
@@ -187,13 +194,13 @@ export function setupConcurrency(QuickSQLite: ISQLite) {
           registerUpdateHook(dbName, callback);
         },
         // TODO
-        attach: (dbNameToAttach: string, alias: string, location?: string) => {},
-        detach: (alias: string) => {},
-        delete: () => {},
-        executeBatch: (commands: SQLBatchTuple[]) => {},
-        executeBatchAsync: (commands: SQLBatchTuple[]) => {},
-        loadFile: (location: string) => {},
-        loadFileAsync: (location: string) => {}
+        delete: () => QuickSQLite.delete(dbName, location),
+        executeBatchAsync: (commands: SQLBatchTuple[]) =>
+          writeLock((context) => QuickSQLite.executeBatchAsync(dbName, commands, (context as any)._contextId)),
+        attach: (dbNameToAttach: string, alias: string, location?: string) =>
+          QuickSQLite.attach(dbName, dbNameToAttach, alias, location),
+        detach: (alias: string) => QuickSQLite.detach(dbName, alias),
+        loadFileAsync: (location: string) => writeLock((context) => QuickSQLite.loadFileAsync(dbName, location))
       };
     }
   };

@@ -1,6 +1,7 @@
 /**
  * SQL Batch execution implementation using default sqliteBridge implementation
-*/
+ */
+#include "ConnectionPool.h"
 #include "JSIHelper.h"
 #include "sqliteBridge.h"
 
@@ -13,12 +14,16 @@ struct QuickQueryArguments {
 };
 
 /**
- * Local Helper method to translate JSI objects QuickQueryArguments datastructure 
- * MUST be called in the JavaScript Thread
-*/
-void jsiBatchParametersToQuickArguments(jsi::Runtime &rt, jsi::Array const &batchParams, vector<QuickQueryArguments> *commands);
+ * Local Helper method to translate JSI objects QuickQueryArguments
+ * datastructure MUST be called in the JavaScript Thread
+ */
+void jsiBatchParametersToQuickArguments(jsi::Runtime &rt,
+                                        jsi::Array const &batchParams,
+                                        vector<QuickQueryArguments> *commands);
 
 /**
- * Execute a batch of commands in a exclusive transaction 
-*/
-SequelBatchOperationResult sqliteExecuteBatch(std::string dbName, vector<QuickQueryArguments> *commands);
+ * Execute a batch of commands in a exclusive transaction
+ */
+SequelBatchOperationResult
+sqliteExecuteBatch(std::string dbName, ConnectionLockId lockId,
+                   vector<QuickQueryArguments> *commands);

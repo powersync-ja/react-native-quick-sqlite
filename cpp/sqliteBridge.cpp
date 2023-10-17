@@ -95,6 +95,21 @@ sqliteExecuteInContext(std::string dbName, ConnectionLockId const contextId,
                                       metadata);
 }
 
+SequelLiteralUpdateResult
+sqliteExecuteLiteralInContext(std::string dbName,
+                              ConnectionLockId const contextId,
+                              std::string const &query) {
+  if (concurrentDBMap.count(dbName) == 0) {
+    return {SQLiteError,
+            "[react-native-quick-sqlite] SQL execution error: " + dbName +
+                " is not open.",
+            0};
+  }
+
+  ConnectionPool *connection = concurrentDBMap[dbName];
+  return connection->executeLiteralInContext(contextId, query);
+}
+
 void sqliteReleaseLock(std::string const dbName,
                        ConnectionLockId const contextId) {
   if (concurrentDBMap.count(dbName) == 0) {
@@ -132,54 +147,24 @@ SQLiteOPResult sqliteRequestLock(std::string const dbName,
   };
 }
 
-/**
- * TODO funnel this though to all connection pool's connections
- */
 SQLiteOPResult sqliteAttachDb(string const mainDBName, string const docPath,
                               string const databaseToAttach,
                               string const alias) {
-  /**
-   * There is no need to check if mainDBName is opened because
-   * sqliteExecuteLiteral will do that.
-   * */
-  string dbPath = get_db_path(databaseToAttach, docPath);
-  string statement = "ATTACH DATABASE '" + dbPath + "' AS " + alias;
-  SequelLiteralUpdateResult result =
-      sqliteExecuteLiteral(mainDBName, statement);
-  if (result.type == SQLiteError) {
-    return SQLiteOPResult{
-        .type = SQLiteError,
-        .errorMessage =
-            mainDBName +
-            " was unable to attach another database: " + string(result.message),
-    };
+  if (concurrentDBMap.count(mainDBName) == 0) {
+    return generateNotOpenResult(mainDBName);
   }
-  return SQLiteOPResult{
-      .type = SQLiteOk,
-  };
+
+  ConnectionPool *connection = concurrentDBMap[mainDBName];
+  return connection->attachDatabase(databaseToAttach, docPath, alias);
 }
 
-/**
- * TODO funnel this though to all connection pool's connections
- */
 SQLiteOPResult sqliteDetachDb(string const mainDBName, string const alias) {
-  /**
-   * There is no need to check if mainDBName is opened because
-   * sqliteExecuteLiteral will do that.
-   * */
-  string statement = "DETACH DATABASE " + alias;
-  SequelLiteralUpdateResult result =
-      sqliteExecuteLiteral(mainDBName, statement);
-  if (result.type == SQLiteError) {
-    return SQLiteOPResult{
-        .type = SQLiteError,
-        .errorMessage = mainDBName + "was unable to detach database: " +
-                        string(result.message),
-    };
+  if (concurrentDBMap.count(mainDBName) == 0) {
+    return generateNotOpenResult(mainDBName);
   }
-  return SQLiteOPResult{
-      .type = SQLiteOk,
-  };
+
+  ConnectionPool *connection = concurrentDBMap[mainDBName];
+  return connection->detachDatabase(alias);
 }
 
 SQLiteOPResult sqliteRemoveDb(string const dbName, string const docPath) {
@@ -204,4 +189,24 @@ SQLiteOPResult sqliteRemoveDb(string const dbName, string const docPath) {
   return SQLiteOPResult{
       .type = SQLiteOk,
   };
+}
+
+/**
+ * This should only be triggered once in a valid lock context. JSI bridge will
+ * handle synchronization
+ */
+SequelBatchOperationResult sqliteImportFile(std::string const dbName,
+                                            std::string const fileLocation) {
+  if (concurrentDBMap.count(dbName) == 1) {
+    SQLiteOPResult closeResult = sqliteCloseDb(dbName);
+    if (closeResult.type == SQLiteError) {
+      return SequelBatchOperationResult{
+          .type = SQLiteError,
+          .message = "DB is not open",
+      };
+    }
+  }
+
+  ConnectionPool *connection = concurrentDBMap[dbName];
+  return connection->importSQLFile(fileLocation);
 }

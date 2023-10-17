@@ -1,7 +1,6 @@
 #include "JSIHelper.h"
 #include "ThreadPool.h"
 #include "sqlite3.h"
-#include "sqliteBridge.h"
 #include <string>
 #include <vector>
 
@@ -98,6 +97,9 @@ public:
                                   vector<map<string, QuickValue>> *results,
                                   vector<QuickColumnMetadata> *metadata);
 
+  SequelLiteralUpdateResult executeLiteralInContext(ConnectionLockId contextId,
+                                                    string const &query);
+
   /**
    * Callback function when a new context is available for use
    */
@@ -121,7 +123,23 @@ public:
    */
   void closeAll();
 
+  /**
+   * Attaches another database to all connections
+   */
+  SQLiteOPResult attachDatabase(std::string const dbFileName,
+                                std::string const docPath,
+                                std::string const alias);
+
+  SQLiteOPResult detachDatabase(std::string const alias);
+
+  /**
+   * Executes commands from a SQLite file
+   */
+  SequelBatchOperationResult importSQLFile(std::string fileLocation);
+
 private:
+  std::vector<sqlite3 *> getAllConnections();
+
   void activateContext(ConnectionState *state, ConnectionLockId contextId);
 
   SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,
