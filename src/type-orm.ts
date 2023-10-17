@@ -22,7 +22,7 @@ export const setupTypeORMDriver = (open: Open) => ({
     fail: (msg: string) => void
   ): any => {
     try {
-      const _con = open(options.name, options.location);
+      const _con = open(options.name, { location: options.location });
 
       const connection = {
         executeSql: async (

@@ -87,8 +87,22 @@ export enum ConcurrentLockType {
   WRITE
 }
 
+export type OpenOptions = {
+  location?: string;
+  /**
+   * The number of concurrent read connections to use.
+   * Setting this value to zero will only open a single write connection.
+   * Setting this value > 0 will open the DB in WAL mode with [numReadConnections]
+   * read connections and a single write connection. This allows for concurrent
+   * read operations during a write operation.
+   */
+  numReadConnections?: number;
+};
+
+export type Open = (dbName: string, options?: OpenOptions) => QuickSQLiteConnection;
+
 export interface ISQLite {
-  open: (dbName: string, location?: string) => void;
+  open: Open;
   close: (dbName: string) => void;
   delete: (dbName: string, location?: string) => void;
 
@@ -138,4 +152,3 @@ export type QuickSQLiteConnection = {
    */
   registerUpdateHook(callback: UpdateCallback): void;
 };
-export type Open = (dbName: string, location?: string) => QuickSQLiteConnection;

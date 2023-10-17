@@ -10,8 +10,8 @@ ConnectionPool::ConnectionPool(std::string dbName, std::string docPath,
                                unsigned int numReadConnections)
     : dbName(dbName), maxReads(numReadConnections) {
 
-  lastLockId = EMPTY_LOCK_ID;
   onContextCallback = nullptr;
+  isConcurrencyEnabled = maxReads > 0;
 
   struct ConnectionState writeCon;
   writeCon.connection = nullptr;
@@ -35,27 +35,34 @@ ConnectionPool::ConnectionPool(std::string dbName, std::string docPath,
     readConnections.push_back(readCon);
   }
 
-  // Write connection
-  sqliteExecuteLiteralWithDB(this->writeConnection.connection,
-                             "PRAGMA journal_mode = WAL;");
-  sqliteExecuteLiteralWithDB(
-      this->writeConnection.connection,
-      "PRAGMA journal_size_limit = 6291456"); // 6Mb 1.5x default checkpoint
-                                              // size
-  // Default to normal on all connections
-  sqliteExecuteLiteralWithDB(this->writeConnection.connection,
-                             "PRAGMA synchronous = NORMAL;");
-
-  // Read connections
-  for (int i = 0; i < this->maxReads; i++) {
-    sqliteExecuteLiteralWithDB(this->readConnections[i].connection,
+  if (true == isConcurrencyEnabled) {
+    // Write connection
+    sqliteExecuteLiteralWithDB(this->writeConnection.connection,
+                               "PRAGMA journal_mode = WAL;");
+    sqliteExecuteLiteralWithDB(
+        this->writeConnection.connection,
+        "PRAGMA journal_size_limit = 6291456"); // 6Mb 1.5x default checkpoint
+                                                // size
+    // Default to normal on all connections
+    sqliteExecuteLiteralWithDB(this->writeConnection.connection,
                                "PRAGMA synchronous = NORMAL;");
+
+    // Read connections
+    for (int i = 0; i < this->maxReads; i++) {
+      sqliteExecuteLiteralWithDB(this->readConnections[i].connection,
+                                 "PRAGMA synchronous = NORMAL;");
+    }
   }
 };
 
 ConnectionPool::~ConnectionPool() {}
 
 void ConnectionPool::readLock(ConnectionLockId contextId) {
+  // Maintain compatibility if no concurrent read connections are present
+  if (false == isConcurrencyEnabled) {
+    return writeLock(contextId);
+  }
+
   // Create a new Id for a new lock
   // Check if there are any available read connections
   if (readQueue.size() > 0) {
@@ -132,8 +139,8 @@ ConnectionPool::executeLiteralInContext(ConnectionLockId contextId,
   if (db == nullptr) {
     // throw error that context is not available
     return SequelLiteralUpdateResult{
-        .message = "Context is no longer available",
         .type = SQLiteError,
+        .message = "Context is no longer available",
     };
   }
 

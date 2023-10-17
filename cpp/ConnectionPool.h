@@ -8,7 +8,6 @@
 #define ConnectionPool_h
 
 // The number of concurrent read connections to the database.
-#define READ_CONNECTIONS 4
 #define EMPTY_LOCK_ID ""
 
 typedef std::string ConnectionLockId;
@@ -67,19 +66,18 @@ private:
   std::vector<ConnectionLockId> readQueue;
   std::vector<ConnectionLockId> writeQueue;
 
-  ConnectionLockId lastLockId;
   void (*onContextCallback)(std::string, ConnectionLockId);
+
+  bool isConcurrencyEnabled;
 
 public:
   ConnectionPool(std::string dbName, std::string docPath,
-                 unsigned int numReadConnections = READ_CONNECTIONS);
+                 unsigned int numReadConnections);
   ~ConnectionPool();
 
   /**
    * Add a task to the read queue. If there are no available connections,
    * the task will be queued.
-   * No transaction is started. use readTransaction for automatic transaction
-   * management.
    */
   void readLock(ConnectionLockId contextId);
 
@@ -89,7 +87,7 @@ public:
   void writeLock(ConnectionLockId contextId);
 
   /**
-   * Execute on context
+   * Execute in context
    */
   SQLiteOPResult executeInContext(ConnectionLockId contextId,
                                   string const &query,
@@ -97,6 +95,9 @@ public:
                                   vector<map<string, QuickValue>> *results,
                                   vector<QuickColumnMetadata> *metadata);
 
+  /**
+   * Execute in context
+   */
   SequelLiteralUpdateResult executeLiteralInContext(ConnectionLockId contextId,
                                                     string const &query);
 

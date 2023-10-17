@@ -22,7 +22,7 @@
 using namespace std;
 using namespace facebook;
 
-std::map<std::string, ConnectionPool *> concurrentDBMap =
+std::map<std::string, ConnectionPool *> dbMap =
     std::map<std::string, ConnectionPool *>();
 
 SQLiteOPResult generateNotOpenResult(std::string const &dbName) {
@@ -39,17 +39,18 @@ SQLiteOPResult
 sqliteOpenDb(string const dbName, string const docPath,
              void (*contextAvailableCallback)(std::string, ConnectionLockId),
              void (*updateTableCallback)(void *, int, const char *,
-                                         const char *, sqlite3_int64)) {
-  if (concurrentDBMap.count(dbName) == 1) {
+                                         const char *, sqlite3_int64),
+             uint32_t numReadConnections) {
+  if (dbMap.count(dbName) == 1) {
     return SQLiteOPResult{
         .type = SQLiteError,
         .errorMessage = dbName + " is already open",
     };
   }
 
-  concurrentDBMap[dbName] = new ConnectionPool(dbName, docPath);
-  concurrentDBMap[dbName]->setOnContextAvailable(contextAvailableCallback);
-  concurrentDBMap[dbName]->setTableUpdateHandler(updateTableCallback);
+  dbMap[dbName] = new ConnectionPool(dbName, docPath, numReadConnections);
+  dbMap[dbName]->setOnContextAvailable(contextAvailableCallback);
+  dbMap[dbName]->setTableUpdateHandler(updateTableCallback);
 
   return SQLiteOPResult{
       .type = SQLiteOk,
@@ -57,15 +58,15 @@ sqliteOpenDb(string const dbName, string const docPath,
 }
 
 SQLiteOPResult sqliteCloseDb(string const dbName) {
-  if (concurrentDBMap.count(dbName) == 0) {
+  if (dbMap.count(dbName) == 0) {
     return generateNotOpenResult(dbName);
   }
 
-  ConnectionPool *connection = concurrentDBMap[dbName];
+  ConnectionPool *connection = dbMap[dbName];
 
   connection->closeAll();
   delete connection;
-  concurrentDBMap.erase(dbName);
+  dbMap.erase(dbName);
 
   return SQLiteOPResult{
       .type = SQLiteOk,
@@ -73,11 +74,11 @@ SQLiteOPResult sqliteCloseDb(string const dbName) {
 }
 
 void sqliteCloseAll() {
-  for (auto const &x : concurrentDBMap) {
+  for (auto const &x : dbMap) {
     x.second->closeAll();
     delete x.second;
   }
-  concurrentDBMap.clear();
+  dbMap.clear();
 }
 
 SQLiteOPResult
@@ -86,11 +87,11 @@ sqliteExecuteInContext(std::string dbName, ConnectionLockId const contextId,
                        std::vector<QuickValue> *params,
                        std::vector<map<string, QuickValue>> *results,
                        std::vector<QuickColumnMetadata> *metadata) {
-  if (concurrentDBMap.count(dbName) == 0) {
+  if (dbMap.count(dbName) == 0) {
     return generateNotOpenResult(dbName);
   }
 
-  ConnectionPool *connection = concurrentDBMap[dbName];
+  ConnectionPool *connection = dbMap[dbName];
   return connection->executeInContext(contextId, query, params, results,
                                       metadata);
 }
@@ -99,36 +100,36 @@ SequelLiteralUpdateResult
 sqliteExecuteLiteralInContext(std::string dbName,
                               ConnectionLockId const contextId,
                               std::string const &query) {
-  if (concurrentDBMap.count(dbName) == 0) {
+  if (dbMap.count(dbName) == 0) {
     return {SQLiteError,
             "[react-native-quick-sqlite] SQL execution error: " + dbName +
                 " is not open.",
             0};
   }
 
-  ConnectionPool *connection = concurrentDBMap[dbName];
+  ConnectionPool *connection = dbMap[dbName];
   return connection->executeLiteralInContext(contextId, query);
 }
 
 void sqliteReleaseLock(std::string const dbName,
                        ConnectionLockId const contextId) {
-  if (concurrentDBMap.count(dbName) == 0) {
+  if (dbMap.count(dbName) == 0) {
     // Do nothing if the lock does not actually exist
     return;
   }
 
-  ConnectionPool *connection = concurrentDBMap[dbName];
+  ConnectionPool *connection = dbMap[dbName];
   connection->closeContext(contextId);
 }
 
 SQLiteOPResult sqliteRequestLock(std::string const dbName,
                                  ConnectionLockId const contextId,
                                  ConcurrentLockType lockType) {
-  if (concurrentDBMap.count(dbName) == 0) {
+  if (dbMap.count(dbName) == 0) {
     return generateNotOpenResult(dbName);
   }
 
-  ConnectionPool *connection = concurrentDBMap[dbName];
+  ConnectionPool *connection = dbMap[dbName];
 
   switch (lockType) {
   case ConcurrentLockType::ReadLock:
@@ -150,25 +151,25 @@ SQLiteOPResult sqliteRequestLock(std::string const dbName,
 SQLiteOPResult sqliteAttachDb(string const mainDBName, string const docPath,
                               string const databaseToAttach,
                               string const alias) {
-  if (concurrentDBMap.count(mainDBName) == 0) {
+  if (dbMap.count(mainDBName) == 0) {
     return generateNotOpenResult(mainDBName);
   }
 
-  ConnectionPool *connection = concurrentDBMap[mainDBName];
+  ConnectionPool *connection = dbMap[mainDBName];
   return connection->attachDatabase(databaseToAttach, docPath, alias);
 }
 
 SQLiteOPResult sqliteDetachDb(string const mainDBName, string const alias) {
-  if (concurrentDBMap.count(mainDBName) == 0) {
+  if (dbMap.count(mainDBName) == 0) {
     return generateNotOpenResult(mainDBName);
   }
 
-  ConnectionPool *connection = concurrentDBMap[mainDBName];
+  ConnectionPool *connection = dbMap[mainDBName];
   return connection->detachDatabase(alias);
 }
 
 SQLiteOPResult sqliteRemoveDb(string const dbName, string const docPath) {
-  if (concurrentDBMap.count(dbName) == 1) {
+  if (dbMap.count(dbName) == 1) {
     SQLiteOPResult closeResult = sqliteCloseDb(dbName);
     if (closeResult.type == SQLiteError) {
       return closeResult;
@@ -197,7 +198,7 @@ SQLiteOPResult sqliteRemoveDb(string const dbName, string const docPath) {
  */
 SequelBatchOperationResult sqliteImportFile(std::string const dbName,
                                             std::string const fileLocation) {
-  if (concurrentDBMap.count(dbName) == 1) {
+  if (dbMap.count(dbName) == 1) {
     SQLiteOPResult closeResult = sqliteCloseDb(dbName);
     if (closeResult.type == SQLiteError) {
       return SequelBatchOperationResult{
@@ -207,6 +208,6 @@ SequelBatchOperationResult sqliteImportFile(std::string const dbName,
     }
   }
 
-  ConnectionPool *connection = concurrentDBMap[dbName];
+  ConnectionPool *connection = dbMap[dbName];
   return connection->importSQLFile(fileLocation);
 }

@@ -115,18 +115,32 @@ void install(jsi::Runtime &rt,
 
     string dbName = args[0].asString(rt).utf8(rt);
     string tempDocPath = string(docPathStr);
+    unsigned int numReadConnections = 0;
 
     if (count > 1 && !args[1].isUndefined() && !args[1].isNull()) {
-      if (!args[1].isString()) {
+      if (!args[1].isObject()) {
         throw jsi::JSError(rt, "[react-native-quick-sqlite][open] database "
-                               "location must be a string");
+                               "options must be an object");
       }
 
-      tempDocPath = tempDocPath + "/" + args[1].asString(rt).utf8(rt);
+      auto options = args[1].asObject(rt);
+      auto numReadConnectionsProperty =
+          options.getProperty(rt, "numReadConnections");
+      if (!numReadConnectionsProperty.isUndefined()) {
+        numReadConnections = numReadConnectionsProperty.asNumber();
+      }
+
+      auto locationPropertyProperty = options.getProperty(rt, "location");
+      if (!locationPropertyProperty.isUndefined() &&
+          !locationPropertyProperty.isNull()) {
+        tempDocPath =
+            tempDocPath + "/" + locationPropertyProperty.asString(rt).utf8(rt);
+      }
     }
 
-    auto result = sqliteOpenDb(
-        dbName, tempDocPath, &contextLockAvailableHandler, &updateTableHandler);
+    auto result =
+        sqliteOpenDb(dbName, tempDocPath, &contextLockAvailableHandler,
+                     &updateTableHandler, numReadConnections);
     if (result.type == SQLiteError) {
       throw jsi::JSError(rt, result.errorMessage.c_str());
     }

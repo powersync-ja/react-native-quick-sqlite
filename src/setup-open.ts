@@ -7,7 +7,8 @@ import {
   LockOptions,
   TransactionContext,
   UpdateCallback,
-  SQLBatchTuple
+  SQLBatchTuple,
+  OpenOptions
 } from './types';
 
 import uuid from 'uuid';
@@ -18,6 +19,8 @@ type LockCallbackRecord = {
   callback: (context: LockContext) => Promise<any>;
   timeout?: NodeJS.Timeout;
 };
+
+const DEFAULT_READ_CONNECTIONS = 4;
 
 const LockCallbacks: Record<ContextLockID, LockCallbackRecord> = {};
 let proxy: ISQLite;
@@ -79,9 +82,17 @@ export function setupOpen(QuickSQLite: ISQLite) {
   proxy = QuickSQLite;
 
   return {
-    open: (dbName: string, location?: string): QuickSQLiteConnection => {
+    /**
+     * Opens a SQLite DB connection.
+     * By default opens DB in WAL mode with 4 Read connections and a single
+     * write connection
+     */
+    open: (dbName: string, options: OpenOptions = {}): QuickSQLiteConnection => {
       // Opens the connection
-      QuickSQLite.open(dbName, location);
+      QuickSQLite.open(dbName, {
+        ...options,
+        numReadConnections: options?.numReadConnections ?? DEFAULT_READ_CONNECTIONS
+      });
 
       /**
        * Wraps lock requests and their callbacks in order to resolve the lock
@@ -193,8 +204,7 @@ export function setupOpen(QuickSQLite: ISQLite) {
         registerUpdateHook: (callback: UpdateCallback) => {
           registerUpdateHook(dbName, callback);
         },
-        // TODO
-        delete: () => QuickSQLite.delete(dbName, location),
+        delete: () => QuickSQLite.delete(dbName, options?.location),
         executeBatchAsync: (commands: SQLBatchTuple[]) =>
           writeLock((context) => QuickSQLite.executeBatchAsync(dbName, commands, (context as any)._contextId)),
         attach: (dbNameToAttach: string, alias: string, location?: string) =>

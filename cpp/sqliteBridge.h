@@ -15,6 +15,8 @@
 #ifndef SQLiteBridge_h
 #define SQLiteBridge_h
 
+#define CONCURRENT_READ_CONNECTIONS 4
+
 using namespace facebook;
 
 enum ConcurrentLockType {
@@ -26,7 +28,8 @@ SQLiteOPResult
 sqliteOpenDb(std::string const dbName, std::string const docPath,
              void (*contextAvailableCallback)(std::string, ConnectionLockId),
              void (*updateTableCallback)(void *, int, const char *,
-                                         const char *, sqlite3_int64));
+                                         const char *, sqlite3_int64),
+             uint32_t numReadConnections);
 
 SQLiteOPResult sqliteCloseDb(string const dbName);
 
