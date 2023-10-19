@@ -51,13 +51,12 @@
   },
   "homepage": "https://github.com/margelo/react-native-quick-sqlite#readme",
   "devDependencies": {
+    "@changesets/cli": "^2.26.2",
+    "@types/lodash": "^4.14.200",
     "@types/uuid": "3.4.0",
     "react": "18.2.0",
     "react-native": "0.71.0",
-    "@changesets/cli": "^2.26.2",
     "react-native-builder-bob": "^0.18.2",
-    "react-native": "0.71.0",
-    "react": "18.2.0",
     "typescript": "^4.8.4"
   },
   "peerDependencies": {
@@ -85,11 +84,7 @@
       ]
     ]
   },
-<<<<<<< HEAD
   "dependencies": {
-    "uuid": "3.4.0"
+    "lodash": "^4.17.21"
   }
-=======
-  "dependencies": {}
->>>>>>> main
 }
