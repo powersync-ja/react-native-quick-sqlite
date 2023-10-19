@@ -4,7 +4,7 @@
     "registry": "https://registry.npmjs.org/",
     "access": "public"
   },
-  "version": "0.0.1-alpha.0",
+  "version": "0.0.1",
   "description": "Fast SQLite for react-native",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
