@@ -4,7 +4,7 @@
     "registry": "https://registry.npmjs.org/",
     "access": "public"
   },
-  "version": "0.0.1-alpha.0",
+  "version": "0.0.1",
   "description": "Fast SQLite for react-native",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
@@ -36,7 +36,7 @@
     "example": "yarn --cwd example",
     "pods": "cd example/ios && bundle exec pod install",
     "bootstrap": "yarn example && yarn && yarn pods",
-    "bump": "./bump-version.sh"
+    "release": "yarn build && yarn changeset publish"
   },
   "keywords": [
     "react-native",
@@ -54,7 +54,10 @@
     "@types/uuid": "3.4.0",
     "react": "18.2.0",
     "react-native": "0.71.0",
+    "@changesets/cli": "^2.26.2",
     "react-native-builder-bob": "^0.18.2",
+    "react-native": "0.71.0",
+    "react": "18.2.0",
     "typescript": "^4.8.4"
   },
   "peerDependencies": {
@@ -82,7 +85,11 @@
       ]
     ]
   },
+<<<<<<< HEAD
   "dependencies": {
     "uuid": "3.4.0"
   }
+=======
+  "dependencies": {}
+>>>>>>> main
 }
