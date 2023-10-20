@@ -332,46 +332,29 @@ void install(jsi::Runtime &rt,
     const string query = args[2].asString(rt).utf8(rt);
     const jsi::Value &originalParams = args[3];
 
-    // Converting query parameters inside the javascript caller thread
+    vector<map<string, QuickValue>> results;
+    vector<QuickColumnMetadata> metadata;
     vector<QuickValue> params;
     jsiQueryArgumentsToSequelParam(rt, originalParams, &params);
 
-    auto promiseCtr = rt.global().getPropertyAsFunction(rt, "Promise");
-    auto promise = promiseCtr.callAsConstructor(rt, HOSTFN("executor", 2) {
-      auto resolve = std::make_shared<jsi::Value>(rt, args[0]);
-      auto reject = std::make_shared<jsi::Value>(rt, args[1]);
+    // Converting results into a JSI Response
+    try {
+      auto status = sqliteExecuteInContext(
+          dbName, contextLockId, query,
+          make_shared<vector<QuickValue>>(params).get(), &results, &metadata);
 
-      try {
-        vector<map<string, QuickValue>> results;
-        vector<QuickColumnMetadata> metadata;
-        auto status = sqliteExecuteInContext(
-            dbName, contextLockId, query,
-            make_shared<vector<QuickValue>>(params).get(), &results, &metadata);
-        invoker->invokeAsync(
-            [&rt,
-             results = make_shared<vector<map<string, QuickValue>>>(results),
-             metadata = make_shared<vector<QuickColumnMetadata>>(metadata),
-             status_copy = move(status), resolve, reject] {
-              if (status_copy.type == SQLiteOk) {
-                auto jsiResult = createSequelQueryExecutionResult(
-                    rt, status_copy, results.get(), metadata.get());
-                resolve->asObject(rt).asFunction(rt).call(rt, move(jsiResult));
-              } else {
-                auto errorCtr = rt.global().getPropertyAsFunction(rt, "Error");
-                auto error = errorCtr.callAsConstructor(
-                    rt,
-                    jsi::String::createFromUtf8(rt, status_copy.errorMessage));
-                reject->asObject(rt).asFunction(rt).call(rt, error);
-              }
-            });
-      } catch (std::exception &exc) {
-        invoker->invokeAsync([&rt, &exc] { jsi::JSError(rt, exc.what()); });
+      if (status.type == SQLiteError) {
+        //        throw std::runtime_error(status.errorMessage);
+        throw jsi::JSError(rt, status.errorMessage);
+        //        return {};
       }
 
-      return {};
-    }));
-
-    return promise;
+      auto jsiResult =
+          createSequelQueryExecutionResult(rt, status, &results, &metadata);
+      return jsiResult;
+    } catch (std::exception &e) {
+      throw jsi::JSError(rt, e.what());
+    }
   });
 
   auto executeBatchAsync = HOSTFN("executeBatchAsync", 2) {
