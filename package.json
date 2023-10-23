@@ -19,7 +19,6 @@
     "cpp",
     "meta.json",
     "react-native-quick-sqlite.podspec",
-    "!lib/typescript/example",
     "!android/build",
     "!android/.cxx",
     "!ios/build",
@@ -33,8 +32,6 @@
     "typescript": "tsc --noEmit",
     "prepare": "bob build",
     "example": "yarn --cwd example",
-    "pods": "cd example/ios && bundle exec pod install",
-    "bootstrap": "yarn example && yarn && yarn pods",
     "release": "yarn changeset publish"
   },
   "keywords": [
