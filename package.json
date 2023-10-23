@@ -32,11 +32,10 @@
     "clean": "rm -rf lib tsconfig.tsbuildinfo",
     "typescript": "tsc --noEmit",
     "prepare": "bob build",
-    "preversion": "node ./scripts/dev-package-version.js $npm_package_version",
     "example": "yarn --cwd example",
     "pods": "cd example/ios && bundle exec pod install",
     "bootstrap": "yarn example && yarn && yarn pods",
-    "release": "yarn build && yarn changeset publish"
+    "release": "yarn changeset publish"
   },
   "keywords": [
     "react-native",

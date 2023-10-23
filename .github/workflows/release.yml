@@ -20,6 +20,7 @@ jobs:
         with:
           node-version: 18
 
+      # This also builds the package as part of the post install
       - name: Install Dependencies
         run: yarn
 
