@@ -1,3 +1,4 @@
+/// <reference types="nativewind/types" />
 import React, { useEffect, useState } from 'react';
 import { SafeAreaView, ScrollView, Text } from 'react-native';
 import 'reflect-metadata';
@@ -15,7 +16,9 @@ export default function App() {
     runTests(
       registerBaseTests
       // registerTypeORMTests
-    ).then(setResults);
+    ).then((results) => {
+      setResults(results);
+    });
   }, []);
 
   return (

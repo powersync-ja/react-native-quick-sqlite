@@ -46,7 +46,7 @@ global.onLockContextIsAvailable = async (dbName: string, lockId: ContextLockID) 
   setImmediate(async () => {
     try {
       const record = LockCallbacks[lockId];
-      if (record.timeout) {
+      if (record?.timeout) {
         clearTimeout(record.timeout);
       }
       await record?.callback({
@@ -174,8 +174,25 @@ export function setupOpen(QuickSQLite: ISQLite) {
         const rollback = finalizedStatement(() => context.execute('ROLLBACK'));
         const rollbackAsync = finalizedStatement(() => context.executeAsync('ROLLBACK'));
 
+        const wrapExecute =
+          <T>(method: (sql: string, params?: any[]) => T): ((sql: string, params?: any[]) => T) =>
+          (sql: string, params?: any[]) => {
+            if (finalized) {
+              throw new Error(`Cannot execute in transaction after it has been finalized with commit/rollback.`);
+            }
+            return method(sql, params);
+          };
+
         try {
-          const res = await callback({ ...context, commit, commitAsync, rollback, rollbackAsync });
+          const res = await callback({
+            ...context,
+            commit,
+            commitAsync,
+            rollback,
+            rollbackAsync,
+            execute: wrapExecute(context.execute),
+            executeAsync: wrapExecute(context.executeAsync)
+          });
           switch (defaultFinally) {
             case 'commit':
               await commitAsync();

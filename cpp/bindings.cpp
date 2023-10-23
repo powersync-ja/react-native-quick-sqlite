@@ -32,7 +32,7 @@ int init_powersync_sqlite_plugin() {
   return result;
 }
 
-void clearState() { sqliteCloseAll(); }
+void osp::clearState() { sqliteCloseAll(); }
 
 /**
  * Callback handler for SQLite table updates
@@ -90,9 +90,9 @@ void contextLockAvailableHandler(std::string dbName,
   });
 }
 
-void install(jsi::Runtime &rt,
-             std::shared_ptr<react::CallInvoker> jsCallInvoker,
-             const char *docPath) {
+void osp::install(jsi::Runtime &rt,
+                  std::shared_ptr<react::CallInvoker> jsCallInvoker,
+                  const char *docPath) {
   docPathStr = std::string(docPath);
   invoker = jsCallInvoker;
   runtime = &rt;
