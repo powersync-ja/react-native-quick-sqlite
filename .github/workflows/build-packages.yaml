@@ -17,15 +17,13 @@ jobs:
         uses: actions/setup-node@v2
         with:
           node-version: 18
-          cache: "yarn"
+          cache: 'yarn'
 
       - name: Setup Yarn
         run: |
           npm install -g yarn
           echo "Yarn version: $(yarn -v)"
 
+      # Build is triggered in prepare script
       - name: Install Dependencies
         run: yarn install --frozen-lockfile
-
-      - name: Build
-        run: yarn build
