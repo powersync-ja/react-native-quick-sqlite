@@ -17,6 +17,7 @@ export default function App() {
       registerBaseTests
       // registerTypeORMTests
     ).then((results) => {
+      console.log(JSON.stringify(results, null, '\t'));
       setResults(results);
     });
   }, []);
