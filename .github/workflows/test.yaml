@@ -12,6 +12,18 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Gradle Cache
+        uses: gradle/gradle-build-action@v2
+
+      - name: AVD Cache
+        uses: actions/cache@v3
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-29
+
       - name: Setup NodeJS
         uses: actions/setup-node@v2
         with:
@@ -38,6 +50,17 @@ jobs:
           cd tests
           yarn install
 
+      - name: create AVD and generate snapshot for caching
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          avd-name: macOS-avd-x86_64-29
+          script: echo "Generated AVD snapshot for caching."
+
       - name: Run connected tests
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
@@ -45,4 +68,4 @@ jobs:
           target: google_apis
           arch: x86_64
           avd-name: macOS-avd-x86_64-29
-          script: cd tests && yarn android
+          script: cd tests && yarn android -d macOS-avd-x86_64-29
