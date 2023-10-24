@@ -22,13 +22,13 @@ ConnectionPool::ConnectionPool(std::string dbName, std::string docPath,
   // Open the write connection
   genericSqliteOpenDb(dbName, docPath, &writeConnection.connection,
                       SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE |
-                          SQLITE_OPEN_NOMUTEX);
+                          SQLITE_OPEN_FULLMUTEX);
 
   // Open the read connections
   for (int i = 0; i < maxReads; i++) {
     sqlite3 *db;
     genericSqliteOpenDb(dbName, docPath, &db,
-                        SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX);
+                        SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX);
     struct ConnectionState readCon;
     readCon.connection = db;
     readCon.currentLockId = EMPTY_LOCK_ID;
@@ -206,9 +206,19 @@ SQLiteOPResult ConnectionPool::attachDatabase(std::string const dbFileName,
 
   auto dbConnections = getAllConnections();
 
-  for (auto &connection : dbConnections) {
+  for (auto &connectionState : dbConnections) {
+    if (connectionState.currentLockId != EMPTY_LOCK_ID) {
+      return SQLiteOPResult{
+          .type = SQLiteError,
+          .errorMessage = dbName + " was unable to attach another database: " +
+                          "Some DB connections were locked",
+      };
+    }
+  }
+
+  for (auto &connectionState : dbConnections) {
     SequelLiteralUpdateResult result =
-        sqliteExecuteLiteralWithDB(connection, statement);
+        sqliteExecuteLiteralWithDB(connectionState.connection, statement);
     if (result.type == SQLiteError) {
       // Revert change on any successful connections
       detachDatabase(alias);
@@ -233,9 +243,19 @@ SQLiteOPResult ConnectionPool::detachDatabase(std::string const alias) {
   string statement = "DETACH DATABASE " + alias;
   auto dbConnections = getAllConnections();
 
-  for (auto &connection : dbConnections) {
+  for (auto &connectionState : dbConnections) {
+    if (connectionState.currentLockId != EMPTY_LOCK_ID) {
+      return SQLiteOPResult{
+          .type = SQLiteError,
+          .errorMessage = dbName + " was unable to detach another database: " +
+                          "Some DB connections were locked",
+      };
+    }
+  }
+
+  for (auto &connectionState : dbConnections) {
     SequelLiteralUpdateResult result =
-        sqliteExecuteLiteralWithDB(connection, statement);
+        sqliteExecuteLiteralWithDB(connectionState.connection, statement);
     if (result.type == SQLiteError) {
       return SQLiteOPResult{
           .type = SQLiteError,
@@ -294,11 +314,11 @@ ConnectionPool::importSQLFile(std::string fileLocation) {
 
 // ===================== Private ===============
 
-std::vector<sqlite3 *> ConnectionPool::getAllConnections() {
-  std::vector<sqlite3 *> result;
-  result.push_back(writeConnection.connection);
+std::vector<ConnectionState> ConnectionPool::getAllConnections() {
+  std::vector<ConnectionState> result;
+  result.push_back(writeConnection);
   for (int i = 0; i < maxReads; i++) {
-    result.push_back(readConnections[i].connection);
+    result.push_back(readConnections[i]);
   }
   return result;
 }

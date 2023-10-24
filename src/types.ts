@@ -142,7 +142,13 @@ export type QuickSQLiteConnection = {
   writeLock: <T>(callback: (context: LockContext) => Promise<T>, options?: LockOptions) => Promise<T>;
   writeTransaction: <T>(callback: (context: TransactionContext) => Promise<T>, options?: LockOptions) => Promise<T>;
   delete: () => void;
+  /**
+   * The attach method should only be called if there are no active locks/transactions.
+   */
   attach: (dbNameToAttach: string, alias: string, location?: string) => void;
+  /**
+   * The detach method should only be called if there are no active locks/transactions.
+   */
   detach: (alias: string) => void;
   executeBatchAsync: (commands: SQLBatchTuple[]) => Promise<BatchQueryResult>;
   loadFileAsync: (location: string) => Promise<FileLoadResult>;

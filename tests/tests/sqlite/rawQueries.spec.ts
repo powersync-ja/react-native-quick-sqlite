@@ -1,5 +1,5 @@
 import Chance from 'chance';
-import { open, QuickSQLiteConnection, SQLBatchTuple, UpdateNotification } from 'react-native-quick-sqlite';
+import { open, QuickSQLite, QuickSQLiteConnection, SQLBatchTuple, UpdateNotification } from 'react-native-quick-sqlite';
 import { beforeEach, describe, it } from '../mocha/MochaRNAdapter';
 import chai from 'chai';
 
@@ -86,15 +86,17 @@ export function registerBaseTests() {
     });
 
     it('Failed insert', async () => {
-      const { id, name, age, networth } = generateUserInfo();
-      // expect(
+      const id = chance.string(); // Setting the id to a string will throw an exception, it expects an int
+      const { name, age, networth } = generateUserInfo();
+      let errorThrown = false;
       try {
         await db.execute('INSERT INTO User (id, name, age, networth) VALUES(?, ?, ?, ?)', [id, name, age, networth]);
       } catch (e: any) {
+        errorThrown = true;
         expect(typeof e).to.equal('object');
-
         expect(e.message).to.include(`cannot store TEXT value in INT column User.id`);
       }
+      expect(errorThrown).to.equal(true);
     });
 
     it('Transaction, auto commit', async () => {
@@ -258,16 +260,6 @@ export function registerBaseTests() {
 
       const res = await db.execute('SELECT * FROM User');
       expect(res.rows?._array).to.eql([]);
-    });
-
-    it('Correctly throws', async () => {
-      const id = chance.string();
-      const { name, age, networth } = generateUserInfo();
-      try {
-        await db.execute('INSERT INTO "User" (id, name, age, networth) VALUES(?, ?, ?, ?)', [id, name, age, networth]);
-      } catch (e: any) {
-        expect(!!e).to.equal(true);
-      }
     });
 
     it('Rollback', async () => {
@@ -643,6 +635,23 @@ export function registerBaseTests() {
       expect((await p2).message).to.include('timed out');
 
       singleConnection.close();
+    });
+
+    it('Should attach DBs', async () => {
+      const singleConnection = open('single_connection', { numReadConnections: 0 });
+      await singleConnection.execute('DROP TABLE IF EXISTS Places; ');
+      await singleConnection.execute('CREATE TABLE Places ( id INT PRIMARY KEY, name TEXT NOT NULL) STRICT;');
+      await singleConnection.execute('INSERT INTO "Places" (id, name) VALUES(0, "Beverly Hills")');
+      singleConnection.close();
+
+      db.attach('single_connection', 'another');
+
+      const result = await db.execute('SELECT * from another.Places');
+
+      db.detach('another');
+      QuickSQLite.delete('single_connection');
+
+      expect(result.rows?.length).to.equal(1);
     });
   });
 }

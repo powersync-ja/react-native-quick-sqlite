@@ -139,7 +139,7 @@ public:
   SequelBatchOperationResult importSQLFile(std::string fileLocation);
 
 private:
-  std::vector<sqlite3 *> getAllConnections();
+  std::vector<ConnectionState> getAllConnections();
 
   void activateContext(ConnectionState *state, ConnectionLockId contextId);
 

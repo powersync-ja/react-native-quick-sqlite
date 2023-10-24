@@ -12,6 +12,7 @@ import {
 } from './types';
 
 import uuid from 'uuid';
+import _ from 'lodash';
 import { enhanceQueryResult } from './utils';
 import { registerUpdateHook } from './table-updates';
 
@@ -111,9 +112,11 @@ export function setupOpen(QuickSQLite: ISQLite) {
             callback: async (context: LockContext) => {
               try {
                 const res = await callback(context);
-                resolve(res);
+
+                // Ensure that we only resolve after locks are freed
+                _.defer(() => resolve(res));
               } catch (ex) {
-                reject(ex);
+                _.defer(() => reject(ex));
               }
             }
           } as LockCallbackRecord);
