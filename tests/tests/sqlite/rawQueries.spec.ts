@@ -32,7 +32,7 @@ export function registerBaseTests() {
   });
 
   describe('Raw queries', () => {
-    it('Insert what', async () => {
+    it('Insert', async () => {
       const { id, name, age, networth } = generateUserInfo();
       const res = await db.execute('INSERT INTO "User" (id, name, age, networth) VALUES(?, ?, ?, ?)', [
         id,

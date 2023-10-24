@@ -5,19 +5,20 @@ import 'reflect-metadata';
 import 'react-native-get-random-values';
 
 import { registerBaseTests, runTests } from './tests/index';
-import { registerTypeORMTests } from './tests/type-orm/typeorm.spec';
-// import {registerTypeORMTests} from './tests/typeorm.spec';
+const TEST_SERVER_URL = 'http://localhost:4243/results';
 
 export default function App() {
   const [results, setResults] = useState<any>([]);
 
   useEffect(() => {
     setResults([]);
-    runTests(
-      registerBaseTests
-      // registerTypeORMTests
-    ).then((results) => {
-      console.log(JSON.stringify(results, null, '\t'));
+    runTests(registerBaseTests).then((results) => {
+      // Send results to host server
+      fetch(TEST_SERVER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(results)
+      });
       setResults(results);
     });
   }, []);
