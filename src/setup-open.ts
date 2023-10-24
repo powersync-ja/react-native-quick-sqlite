@@ -31,7 +31,7 @@ let proxy: ISQLite;
 function closeContextLock(dbName: string, id: ContextLockID) {
   delete LockCallbacks[id];
 
-  // This is configured by the setupConcurrency function
+  // This is configured by the setupOpen function
   proxy.releaseLock(dbName, id);
 }
 
@@ -105,43 +105,35 @@ export function setupOpen(QuickSQLite: ISQLite) {
       ): Promise<T> => {
         const id = uuid.v4(); // TODO maybe do this in C++
         // Wrap the callback in a promise that will resolve to the callback result
-        let resolve: (value: T) => void;
-        let reject: (ex: any) => void;
-
-        const promise = new Promise<T>((res, rej) => {
-          resolve = res;
-          reject = rej;
-        });
-
-        // Add callback to the queue for timing
-        const record = (LockCallbacks[id] = {
-          callback: async (context: LockContext) => {
-            try {
-              const res = await callback(context);
-              resolve(res);
-            } catch (ex) {
-              reject(ex);
+        return new Promise<T>((resolve, reject) => {
+          // Add callback to the queue for timing
+          const record = (LockCallbacks[id] = {
+            callback: async (context: LockContext) => {
+              try {
+                const res = await callback(context);
+                resolve(res);
+              } catch (ex) {
+                reject(ex);
+              }
             }
-          }
-        } as LockCallbackRecord);
+          } as LockCallbackRecord);
 
-        try {
-          QuickSQLite.requestLock(dbName, id, type);
-          const timeout = options?.timeoutMs;
-          if (timeout) {
-            record.timeout = setTimeout(() => {
-              // The callback won't be executed
-              delete LockCallbacks[id];
-              reject(new Error(`Lock request timed out after ${timeout}ms`));
-            }, timeout);
+          try {
+            QuickSQLite.requestLock(dbName, id, type);
+            const timeout = options?.timeoutMs;
+            if (timeout) {
+              record.timeout = setTimeout(() => {
+                // The callback won't be executed
+                delete LockCallbacks[id];
+                reject(new Error(`Lock request timed out after ${timeout}ms`));
+              }, timeout);
+            }
+          } catch (ex) {
+            // Remove callback from the queue
+            delete LockCallbacks[id];
+            reject(ex);
           }
-        } catch (ex) {
-          // Remove callback from the queue
-          delete LockCallbacks[id];
-          reject(ex);
-        }
-
-        return promise;
+        });
       };
 
       const readLock = <T>(callback: (context: LockContext) => Promise<T>, options?: LockOptions): Promise<T> =>

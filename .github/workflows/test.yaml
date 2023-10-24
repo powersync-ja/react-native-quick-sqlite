@@ -50,7 +50,7 @@ jobs:
       - name: Configure Test App
         run: |
           cd tests
-          yarn install
+          yarn install --frozen-lockfile
 
       - name: create AVD and generate snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'

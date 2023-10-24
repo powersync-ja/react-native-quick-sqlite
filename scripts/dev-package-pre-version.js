@@ -1,7 +1,7 @@
 /**
- * Dev package version like 0.0.0-dev-[hash] seem to cause issues with the podspec
- * This script will remove the -dev-hash from the version.
- * Side Note: Versions above 0.0.0 e.g. 0.0.1-dev-[hash] do work with pod install.
+ * Dev package versions like 0.0.0-dev-[timestamp] seem to cause issues with the podspec
+ * This script will remove the -dev-[timestamp] from the version.
+ * Side Note: Versions above 0.0.0 e.g. 0.0.1-dev-[timestamp] do work with pod install.
  */
 const fs = require('fs');
 const path = require('path');

@@ -63,7 +63,6 @@ void ConnectionPool::readLock(ConnectionLockId contextId) {
     return writeLock(contextId);
   }
 
-  // Create a new Id for a new lock
   // Check if there are any available read connections
   if (readQueue.size() > 0) {
     // There are already items queued

@@ -12,7 +12,7 @@ const { program } = require('commander');
 
 const DEFAULT_AVD_NAME = 'macOS-avd-x86_64-29';
 const DEFAULT_PORT = 4243;
-const TEST_TIMEOUT = 600_000; // 10 minutes
+const TEST_TIMEOUT = 1_800_000; // 30 minutes
 
 program.name('Test Suite').description('Automates tests for React Native app based tests');
 

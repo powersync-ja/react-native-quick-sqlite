@@ -46,7 +46,7 @@ void updateTableHandler(void *voidDBName, int opType, char const *dbName,
    */
   invoker->invokeAsync([voidDBName, opType, dbName, tableName, rowId] {
     try {
-      // Sqlite 3 just returns main as the db name is no other DBs are attached
+      // Sqlite 3 just returns main as the db name if no other DBs are attached
       auto global = runtime->global();
       jsi::Function handlerFunction =
           global.getPropertyAsFunction(*runtime, "triggerUpdateHook");
@@ -74,7 +74,6 @@ void contextLockAvailableHandler(std::string dbName,
                                  ConnectionLockId contextId) {
   invoker->invokeAsync([dbName, contextId] {
     try {
-      // Sqlite 3 just returns main as the db name is no other DBs are attached
       auto global = runtime->global();
       jsi::Function handlerFunction =
           global.getPropertyAsFunction(*runtime, "onLockContextIsAvailable");
