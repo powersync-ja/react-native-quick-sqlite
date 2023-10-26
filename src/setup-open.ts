@@ -53,13 +53,8 @@ global.onLockContextIsAvailable = async (dbName: string, lockId: ContextLockID) 
       await record?.callback({
         // @ts-expect-error This is not part of the public interface, but is used internally
         _contextId: lockId,
-        execute: (sql: string, args?: any[]) => {
-          const result = proxy.executeInContext(dbName, lockId, sql, args);
-          enhanceQueryResult(result);
-          return result;
-        },
-        executeAsync: async (sql: string, args?: any[]) => {
-          const result = await proxy.executeInContextAsync(dbName, lockId, sql, args);
+        execute: async (sql: string, args?: any[]) => {
+          const result = await proxy.executeInContext(dbName, lockId, sql, args);
           enhanceQueryResult(result);
           return result;
         }
@@ -150,7 +145,7 @@ export function setupOpen(QuickSQLite: ISQLite) {
         callback: (context: TransactionContext) => Promise<T>,
         defaultFinally: 'commit' | 'rollback' = 'commit'
       ) => {
-        await context.executeAsync('BEGIN TRANSACTION');
+        await context.execute('BEGIN TRANSACTION');
         let finalized = false;
 
         const finalizedStatement =
@@ -164,10 +159,10 @@ export function setupOpen(QuickSQLite: ISQLite) {
           };
 
         const commit = finalizedStatement(() => context.execute('COMMIT'));
-        const commitAsync = finalizedStatement(() => context.executeAsync('COMMIT'));
+        const commitAsync = finalizedStatement(() => context.execute('COMMIT'));
 
         const rollback = finalizedStatement(() => context.execute('ROLLBACK'));
-        const rollbackAsync = finalizedStatement(() => context.executeAsync('ROLLBACK'));
+        const rollbackAsync = finalizedStatement(() => context.execute('ROLLBACK'));
 
         const wrapExecute =
           <T>(method: (sql: string, params?: any[]) => T): ((sql: string, params?: any[]) => T) =>
@@ -182,11 +177,8 @@ export function setupOpen(QuickSQLite: ISQLite) {
           const res = await callback({
             ...context,
             commit,
-            commitAsync,
             rollback,
-            rollbackAsync,
-            execute: wrapExecute(context.execute),
-            executeAsync: wrapExecute(context.executeAsync)
+            execute: wrapExecute(context.execute)
           });
           switch (defaultFinally) {
             case 'commit':
@@ -206,7 +198,7 @@ export function setupOpen(QuickSQLite: ISQLite) {
       // Return the concurrent connection object
       return {
         close: () => QuickSQLite.close(dbName),
-        execute: (sql: string, args?: any[]) => writeLock((context) => context.executeAsync(sql, args)),
+        execute: (sql: string, args?: any[]) => writeLock((context) => context.execute(sql, args)),
         readLock,
         readTransaction: async <T>(callback: (context: TransactionContext) => Promise<T>, options?: LockOptions) =>
           readLock((context) => wrapTransaction(context, callback)),
@@ -217,12 +209,13 @@ export function setupOpen(QuickSQLite: ISQLite) {
           registerUpdateHook(dbName, callback);
         },
         delete: () => QuickSQLite.delete(dbName, options?.location),
-        executeBatchAsync: (commands: SQLBatchTuple[]) =>
-          writeLock((context) => QuickSQLite.executeBatchAsync(dbName, commands, (context as any)._contextId)),
+        executeBatch: (commands: SQLBatchTuple[]) =>
+          writeLock((context) => QuickSQLite.executeBatch(dbName, commands, (context as any)._contextId)),
         attach: (dbNameToAttach: string, alias: string, location?: string) =>
           QuickSQLite.attach(dbName, dbNameToAttach, alias, location),
         detach: (alias: string) => QuickSQLite.detach(dbName, alias),
-        loadFileAsync: (location: string) => writeLock((context) => QuickSQLite.loadFileAsync(dbName, location))
+        loadFile: (location: string) =>
+          writeLock((context) => QuickSQLite.loadFile(dbName, location, (context as any)._contextId))
       };
     }
   };

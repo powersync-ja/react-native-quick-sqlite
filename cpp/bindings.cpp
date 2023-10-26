@@ -6,10 +6,10 @@
 #include "sqlbatchexecutor.h"
 #include "sqlite3.h"
 #include "sqliteBridge.h"
+#include "sqliteExecute.h"
 #include <iostream>
 #include <string>
 #include <vector>
-
 using namespace std;
 using namespace facebook;
 
@@ -259,7 +259,7 @@ void osp::install(jsi::Runtime &rt,
     return {};
   });
 
-  auto executeInContextAsync = HOSTFN("executeInContextAsync", 3) {
+  auto executeInContext = HOSTFN("executeInContext", 3) {
     if (count < 4) {
       throw jsi::JSError(rt,
                          "[react-native-quick-sqlite][executeInContextAsync] "
@@ -282,12 +282,12 @@ void osp::install(jsi::Runtime &rt,
 
       auto task = [&rt, dbName, contextLockId, query,
                    params = make_shared<vector<QuickValue>>(params), resolve,
-                   reject]() {
+                   reject](sqlite3 *db) {
         try {
           vector<map<string, QuickValue>> results;
           vector<QuickColumnMetadata> metadata;
-          auto status = sqliteExecuteInContext(
-              dbName, contextLockId, query, params.get(), &results, &metadata);
+          auto status =
+              sqliteExecuteWithDB(db, query, params.get(), &results, &metadata);
           invoker->invokeAsync(
               [&rt,
                results = make_shared<vector<map<string, QuickValue>>>(results),
@@ -312,51 +312,14 @@ void osp::install(jsi::Runtime &rt,
         }
       };
 
-      globalThreadPool->queueWork(task);
-
+      sqliteQueueInContext(dbName, contextLockId, task);
       return {};
     }));
 
     return promise;
   });
 
-  auto executeInContext = HOSTFN("executeInContext", 3) {
-    if (count < 4) {
-      throw jsi::JSError(rt, "[react-native-quick-sqlite][executeInContext] "
-                             "Incorrect arguments for executeInContext");
-    }
-
-    const string dbName = args[0].asString(rt).utf8(rt);
-    const string contextLockId = args[1].asString(rt).utf8(rt);
-    const string query = args[2].asString(rt).utf8(rt);
-    const jsi::Value &originalParams = args[3];
-
-    vector<map<string, QuickValue>> results;
-    vector<QuickColumnMetadata> metadata;
-    vector<QuickValue> params;
-    jsiQueryArgumentsToSequelParam(rt, originalParams, &params);
-
-    // Converting results into a JSI Response
-    try {
-      auto status = sqliteExecuteInContext(
-          dbName, contextLockId, query,
-          make_shared<vector<QuickValue>>(params).get(), &results, &metadata);
-
-      if (status.type == SQLiteError) {
-        //        throw std::runtime_error(status.errorMessage);
-        throw jsi::JSError(rt, status.errorMessage);
-        //        return {};
-      }
-
-      auto jsiResult =
-          createSequelQueryExecutionResult(rt, status, &results, &metadata);
-      return jsiResult;
-    } catch (std::exception &e) {
-      throw jsi::JSError(rt, e.what());
-    }
-  });
-
-  auto executeBatchAsync = HOSTFN("executeBatchAsync", 2) {
+  auto executeBatch = HOSTFN("executeBatch", 2) {
     if (sizeof(args) < 3) {
       throw jsi::JSError(rt, "[react-native-quick-sqlite][executeAsyncBatch] "
                              "Incorrect parameter count");
@@ -387,11 +350,10 @@ void osp::install(jsi::Runtime &rt,
       auto task = [&rt, dbName,
                    commands =
                        make_shared<vector<QuickQueryArguments>>(commands),
-                   resolve, reject, contextLockId]() {
+                   resolve, reject, contextLockId](sqlite3 *db) {
         try {
           // Inside the new worker thread, we can now call sqlite operations
-          auto batchResult =
-              sqliteExecuteBatch(dbName, contextLockId, commands.get());
+          auto batchResult = sqliteExecuteBatch(db, commands.get());
           invoker->invokeAsync(
               [&rt, batchResult = move(batchResult), resolve, reject] {
                 if (batchResult.type == SQLiteOk) {
@@ -408,8 +370,8 @@ void osp::install(jsi::Runtime &rt,
               [&rt, reject, &exc] { throw jsi::JSError(rt, exc.what()); });
         }
       };
-      globalThreadPool->queueWork(task);
 
+      sqliteQueueInContext(dbName, contextLockId, task);
       return {};
     }));
 
@@ -417,8 +379,8 @@ void osp::install(jsi::Runtime &rt,
   });
 
   // Load SQL File from disk in another thread
-  auto loadFileAsync = HOSTFN("loadFileAsync", 2) {
-    if (sizeof(args) < 2) {
+  auto loadFileAsync = HOSTFN("loadFile", 2) {
+    if (sizeof(args) < 3) {
       throw jsi::JSError(rt, "[react-native-quick-sqlite][loadFileAsync] "
                              "Incorrect parameter count");
       return {};
@@ -426,15 +388,16 @@ void osp::install(jsi::Runtime &rt,
 
     const string dbName = args[0].asString(rt).utf8(rt);
     const string sqlFileName = args[1].asString(rt).utf8(rt);
+    const string contextLockId = args[2].asString(rt).utf8(rt);
 
     auto promiseCtr = rt.global().getPropertyAsFunction(rt, "Promise");
     auto promise = promiseCtr.callAsConstructor(rt, HOSTFN("executor", 2) {
       auto resolve = std::make_shared<jsi::Value>(rt, args[0]);
       auto reject = std::make_shared<jsi::Value>(rt, args[1]);
 
-      auto task = [&rt, dbName, sqlFileName, resolve, reject]() {
+      auto task = [&rt, dbName, sqlFileName, resolve, reject](sqlite3 *db) {
         try {
-          const auto importResult = sqliteImportFile(dbName, sqlFileName);
+          const auto importResult = sqliteImportFile(db, sqlFileName);
 
           invoker->invokeAsync(
               [&rt, result = move(importResult), resolve, reject] {
@@ -454,7 +417,7 @@ void osp::install(jsi::Runtime &rt,
               [&rt, err = exc.what(), reject] { throw jsi::JSError(rt, err); });
         }
       };
-      globalThreadPool->queueWork(task);
+      sqliteQueueInContext(dbName, contextLockId, task);
       return {};
     }));
 
@@ -508,14 +471,13 @@ void osp::install(jsi::Runtime &rt,
   module.setProperty(rt, "open", move(open));
   module.setProperty(rt, "requestLock", move(requestLock));
   module.setProperty(rt, "releaseLock", move(releaseLock));
-  module.setProperty(rt, "executeInContextAsync", move(executeInContextAsync));
-  module.setProperty(rt, "executeInContext", move(executeInContext));
+  module.setProperty(rt, "executeInContextAsync", move(executeInContext));
   module.setProperty(rt, "close", move(close));
 
   module.setProperty(rt, "attach", move(attach));
   module.setProperty(rt, "detach", move(detach));
   module.setProperty(rt, "delete", move(remove));
-  module.setProperty(rt, "executeBatchAsync", move(executeBatchAsync));
+  module.setProperty(rt, "executeBatch", move(executeBatch));
   module.setProperty(rt, "loadFileAsync", move(loadFileAsync));
 
   rt.global().setProperty(rt, "__QuickSQLiteProxy", move(module));

@@ -81,34 +81,15 @@ void sqliteCloseAll() {
   dbMap.clear();
 }
 
-SQLiteOPResult
-sqliteExecuteInContext(std::string dbName, ConnectionLockId const contextId,
-                       std::string const &query,
-                       std::vector<QuickValue> *params,
-                       std::vector<map<string, QuickValue>> *results,
-                       std::vector<QuickColumnMetadata> *metadata) {
+SQLiteOPResult sqliteQueueInContext(std::string dbName,
+                                    ConnectionLockId const contextId,
+                                    std::function<void(sqlite3 *)> task) {
   if (dbMap.count(dbName) == 0) {
     return generateNotOpenResult(dbName);
   }
 
   ConnectionPool *connection = dbMap[dbName];
-  return connection->executeInContext(contextId, query, params, results,
-                                      metadata);
-}
-
-SequelLiteralUpdateResult
-sqliteExecuteLiteralInContext(std::string dbName,
-                              ConnectionLockId const contextId,
-                              std::string const &query) {
-  if (dbMap.count(dbName) == 0) {
-    return {SQLiteError,
-            "[react-native-quick-sqlite] SQL execution error: " + dbName +
-                " is not open.",
-            0};
-  }
-
-  ConnectionPool *connection = dbMap[dbName];
-  return connection->executeLiteralInContext(contextId, query);
+  return connection->queueInContext(contextId, task);
 }
 
 void sqliteReleaseLock(std::string const dbName,
@@ -130,6 +111,13 @@ SQLiteOPResult sqliteRequestLock(std::string const dbName,
   }
 
   ConnectionPool *connection = dbMap[dbName];
+
+  if (connection == nullptr) {
+    return SQLiteOPResult{
+        .type = SQLiteOk,
+
+    };
+  }
 
   switch (lockType) {
   case ConcurrentLockType::ReadLock:
@@ -190,24 +178,4 @@ SQLiteOPResult sqliteRemoveDb(string const dbName, string const docPath) {
   return SQLiteOPResult{
       .type = SQLiteOk,
   };
-}
-
-/**
- * This should only be triggered once in a valid lock context. JSI bridge will
- * handle synchronization
- */
-SequelBatchOperationResult sqliteImportFile(std::string const dbName,
-                                            std::string const fileLocation) {
-  if (dbMap.count(dbName) == 1) {
-    SQLiteOPResult closeResult = sqliteCloseDb(dbName);
-    if (closeResult.type == SQLiteError) {
-      return SequelBatchOperationResult{
-          .type = SQLiteError,
-          .message = "DB is not open",
-      };
-    }
-  }
-
-  ConnectionPool *connection = dbMap[dbName];
-  return connection->importSQLFile(fileLocation);
 }

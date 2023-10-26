@@ -2,6 +2,10 @@
  * Batch execution implementation
  */
 #include "sqlbatchexecutor.h"
+#include "fileUtils.h"
+#include "sqliteExecute.h"
+#include <fstream>
+#include <iostream>
 
 void jsiBatchParametersToQuickArguments(jsi::Runtime &rt,
                                         jsi::Array const &batchParams,
@@ -45,8 +49,7 @@ void jsiBatchParametersToQuickArguments(jsi::Runtime &rt,
 }
 
 SequelBatchOperationResult
-sqliteExecuteBatch(std::string dbName, ConnectionLockId lockId,
-                   vector<QuickQueryArguments> *commands) {
+sqliteExecuteBatch(sqlite3 *db, vector<QuickQueryArguments> *commands) {
   size_t commandCount = commands->size();
   if (commandCount <= 0) {
     return SequelBatchOperationResult{
@@ -58,17 +61,16 @@ sqliteExecuteBatch(std::string dbName, ConnectionLockId lockId,
   try {
     int affectedRows = 0;
 
-    sqliteExecuteLiteralInContext(dbName, lockId,
-                                  "BEGIN EXCLUSIVE TRANSACTION");
+    sqliteExecuteLiteralWithDB(db, "BEGIN EXCLUSIVE TRANSACTION");
 
     for (int i = 0; i < commandCount; i++) {
       auto command = commands->at(i);
       // We do not provide a datastructure to receive query data because we
       // don't need/want to handle this results in a batch execution
-      auto result = sqliteExecuteInContext(dbName, lockId, command.sql,
-                                           command.params.get(), NULL, NULL);
+      auto result = sqliteExecuteWithDB(db, command.sql, command.params.get(),
+                                        NULL, NULL);
       if (result.type == SQLiteError) {
-        sqliteExecuteLiteralInContext(dbName, lockId, "ROLLBACK");
+        sqliteExecuteLiteralWithDB(db, "ROLLBACK");
         return SequelBatchOperationResult{
             .type = SQLiteError,
             .message = result.errorMessage,
@@ -77,17 +79,59 @@ sqliteExecuteBatch(std::string dbName, ConnectionLockId lockId,
         affectedRows += result.rowsAffected;
       }
     }
-    sqliteExecuteLiteralInContext(dbName, lockId, "COMMIT");
+    sqliteExecuteLiteralWithDB(db, "COMMIT");
     return SequelBatchOperationResult{
         .type = SQLiteOk,
         .affectedRows = affectedRows,
         .commands = (int)commandCount,
     };
   } catch (std::exception &exc) {
-    sqliteExecuteLiteralInContext(dbName, lockId, "ROLLBACK");
+    sqliteExecuteLiteralWithDB(db, "ROLLBACK");
     return SequelBatchOperationResult{
         .type = SQLiteError,
         .message = exc.what(),
     };
+  }
+}
+
+SequelBatchOperationResult sqliteImportFile(sqlite3 *db,
+                                            const std::string fileLocation) {
+  std::string line;
+  std::ifstream sqFile(fileLocation);
+
+  if (sqFile.is_open()) {
+    try {
+      int affectedRows = 0;
+      int commands = 0;
+      sqliteExecuteLiteralWithDB(db, "BEGIN EXCLUSIVE TRANSACTION");
+      while (std::getline(sqFile, line, '\n')) {
+        if (!line.empty()) {
+          SequelLiteralUpdateResult result =
+              sqliteExecuteLiteralWithDB(db, line);
+          if (result.type == SQLiteError) {
+            sqliteExecuteLiteralWithDB(db, "ROLLBACK");
+            sqFile.close();
+            return {SQLiteError, result.message, 0, commands};
+          } else {
+            affectedRows += result.affectedRows;
+            commands++;
+          }
+        }
+      }
+      sqFile.close();
+      sqliteExecuteLiteralWithDB(db, "COMMIT");
+      return {SQLiteOk, "", affectedRows, commands};
+    } catch (...) {
+      sqFile.close();
+      sqliteExecuteLiteralWithDB(db, "ROLLBACK");
+      return {SQLiteError,
+              "[react-native-quick-sqlite][loadSQLFile] Unexpected error, "
+              "transaction was rolledback",
+              0, 0};
+    }
+  } else {
+    return {SQLiteError,
+            "[react-native-quick-sqlite][loadSQLFile] Could not open file", 0,
+            0};
   }
 }

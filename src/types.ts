@@ -108,14 +108,13 @@ export interface ISQLite {
 
   requestLock: (dbName: string, id: ContextLockID, type: ConcurrentLockType) => QueryResult;
   releaseLock(dbName: string, id: ContextLockID): void;
-  executeInContext: (dbName: string, id: ContextLockID, query: string, params: any[]) => QueryResult;
-  executeInContextAsync: (dbName: string, id: ContextLockID, query: string, params: any[]) => Promise<QueryResult>;
+  executeInContext: (dbName: string, id: ContextLockID, query: string, params: any[]) => Promise<QueryResult>;
 
   attach: (mainDbName: string, dbNameToAttach: string, alias: string, location?: string) => void;
   detach: (mainDbName: string, alias: string) => void;
 
-  executeBatchAsync: (dbName: string, commands: SQLBatchTuple[], id: ContextLockID) => Promise<BatchQueryResult>;
-  loadFileAsync: (dbName: string, location: string) => Promise<FileLoadResult>;
+  executeBatch: (dbName: string, commands: SQLBatchTuple[], id: ContextLockID) => Promise<BatchQueryResult>;
+  loadFile: (dbName: string, location: string, id: ContextLockID) => Promise<FileLoadResult>;
 }
 
 export interface LockOptions {
@@ -123,15 +122,12 @@ export interface LockOptions {
 }
 
 export interface LockContext {
-  execute: (sql: string, args?: any[]) => QueryResult;
-  executeAsync: (sql: string, args?: any[]) => Promise<QueryResult>;
+  execute: (sql: string, args?: any[]) => Promise<QueryResult>;
 }
 
 export interface TransactionContext extends LockContext {
-  commit: () => QueryResult;
-  commitAsync: () => Promise<QueryResult>;
-  rollback: () => QueryResult;
-  rollbackAsync: () => Promise<QueryResult>;
+  commit: () => Promise<QueryResult>;
+  rollback: () => Promise<QueryResult>;
 }
 
 export type QuickSQLiteConnection = {
@@ -150,8 +146,8 @@ export type QuickSQLiteConnection = {
    * The detach method should only be called if there are no active locks/transactions.
    */
   detach: (alias: string) => void;
-  executeBatchAsync: (commands: SQLBatchTuple[]) => Promise<BatchQueryResult>;
-  loadFileAsync: (location: string) => Promise<FileLoadResult>;
+  executeBatch: (commands: SQLBatchTuple[]) => Promise<BatchQueryResult>;
+  loadFile: (location: string) => Promise<FileLoadResult>;
   /**
    * Note that only one listener can be registered per database connection.
    * Any new hook registration will override the previous one.

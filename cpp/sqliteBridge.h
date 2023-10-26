@@ -44,17 +44,9 @@ SQLiteOPResult sqliteRequestLock(std::string const dbName,
                                  ConnectionLockId const contextId,
                                  ConcurrentLockType lockType);
 
-SQLiteOPResult
-sqliteExecuteInContext(std::string dbName, ConnectionLockId const contextId,
-                       std::string const &query,
-                       std::vector<QuickValue> *params,
-                       std::vector<map<std::string, QuickValue>> *results,
-                       std::vector<QuickColumnMetadata> *metadata);
-
-SequelLiteralUpdateResult
-sqliteExecuteLiteralInContext(std::string dbName,
-                              ConnectionLockId const contextId,
-                              std::string const &query);
+SQLiteOPResult sqliteQueueInContext(std::string dbName,
+                                    ConnectionLockId const contextId,
+                                    std::function<void(sqlite3 *)>);
 
 void sqliteReleaseLock(std::string const dbName,
                        ConnectionLockId const contextId);
@@ -64,8 +56,5 @@ SQLiteOPResult sqliteAttachDb(string const mainDBName, string const docPath,
                               string const alias);
 
 SQLiteOPResult sqliteDetachDb(string const mainDBName, string const alias);
-
-SequelBatchOperationResult sqliteImportFile(string const dbName,
-                                            string const fileLocation);
 
 #endif

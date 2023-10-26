@@ -1,5 +1,5 @@
+#include "ConnectionState.h"
 #include "JSIHelper.h"
-#include "ThreadPool.h"
 #include "sqlite3.h"
 #include <string>
 #include <vector>
@@ -8,15 +8,6 @@
 #define ConnectionPool_h
 
 // The number of concurrent read connections to the database.
-#define EMPTY_LOCK_ID ""
-
-typedef std::string ConnectionLockId;
-
-struct ConnectionState {
-  sqlite3 *connection;
-  ConnectionLockId currentLockId;
-};
-
 /**
  * Concurrent connection pool class.
  *
@@ -60,8 +51,8 @@ class ConnectionPool {
 private:
   int maxReads;
   std::string dbName;
-  std::vector<ConnectionState> readConnections;
-  ConnectionState writeConnection;
+  std::vector<ConnectionState *> readConnections;
+  ConnectionState *writeConnection;
 
   std::vector<ConnectionLockId> readQueue;
   std::vector<ConnectionLockId> writeQueue;
@@ -87,19 +78,10 @@ public:
   void writeLock(ConnectionLockId contextId);
 
   /**
-   * Execute in context
+   * Queue in context
    */
-  SQLiteOPResult executeInContext(ConnectionLockId contextId,
-                                  string const &query,
-                                  vector<QuickValue> *params,
-                                  vector<map<string, QuickValue>> *results,
-                                  vector<QuickColumnMetadata> *metadata);
-
-  /**
-   * Execute in context
-   */
-  SequelLiteralUpdateResult executeLiteralInContext(ConnectionLockId contextId,
-                                                    string const &query);
+  SQLiteOPResult queueInContext(ConnectionLockId contextId,
+                                std::function<void(sqlite3 *)> task);
 
   /**
    * Callback function when a new context is available for use
@@ -133,13 +115,8 @@ public:
 
   SQLiteOPResult detachDatabase(std::string const alias);
 
-  /**
-   * Executes commands from a SQLite file
-   */
-  SequelBatchOperationResult importSQLFile(std::string fileLocation);
-
 private:
-  std::vector<ConnectionState> getAllConnections();
+  std::vector<ConnectionState *> getAllConnections();
 
   void activateContext(ConnectionState *state, ConnectionLockId contextId);
 

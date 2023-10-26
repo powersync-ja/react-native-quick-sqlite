@@ -29,13 +29,13 @@ add_library(
   ../cpp/fileUtils.cpp
   ../cpp/sqliteExecute.h
   ../cpp/sqliteExecute.cpp
-  ../cpp/ThreadPool.h
-  ../cpp/ThreadPool.cpp
   ../cpp/sqlbatchexecutor.h
   ../cpp/sqlbatchexecutor.cpp
   ../cpp/macros.h
   ../cpp/ConnectionPool.cpp
   ../cpp/ConnectionPool.h
+  ../cpp/ConnectionState.cpp
+  ../cpp/ConnectionState.h
   cpp-adapter.cpp
 )
 

@@ -3,8 +3,6 @@
 #include "sqlite3.h"
 #include "sqliteBridge.h"
 #include "sqliteExecute.h"
-#include <fstream>
-#include <iostream>
 
 ConnectionPool::ConnectionPool(std::string dbName, std::string docPath,
                                unsigned int numReadConnections)
@@ -13,49 +11,44 @@ ConnectionPool::ConnectionPool(std::string dbName, std::string docPath,
   onContextCallback = nullptr;
   isConcurrencyEnabled = maxReads > 0;
 
-  struct ConnectionState writeCon;
-  writeCon.connection = nullptr;
-  writeCon.currentLockId = EMPTY_LOCK_ID;
-
-  writeConnection = writeCon;
-
   // Open the write connection
-  genericSqliteOpenDb(dbName, docPath, &writeConnection.connection,
-                      SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE |
-                          SQLITE_OPEN_FULLMUTEX);
+  writeConnection = new ConnectionState(
+      dbName, docPath,
+      SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX);
 
   // Open the read connections
   for (int i = 0; i < maxReads; i++) {
-    sqlite3 *db;
-    genericSqliteOpenDb(dbName, docPath, &db,
-                        SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX);
-    struct ConnectionState readCon;
-    readCon.connection = db;
-    readCon.currentLockId = EMPTY_LOCK_ID;
-    readConnections.push_back(readCon);
+    readConnections.push_back(new ConnectionState(
+        dbName, docPath, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX));
   }
 
   if (true == isConcurrencyEnabled) {
-    // Write connection
-    sqliteExecuteLiteralWithDB(this->writeConnection.connection,
-                               "PRAGMA journal_mode = WAL;");
-    sqliteExecuteLiteralWithDB(
-        this->writeConnection.connection,
-        "PRAGMA journal_size_limit = 6291456"); // 6Mb 1.5x default checkpoint
-                                                // size
-    // Default to normal on all connections
-    sqliteExecuteLiteralWithDB(this->writeConnection.connection,
-                               "PRAGMA synchronous = NORMAL;");
+    // Write connection WAL setup
+    writeConnection->queueWork([](sqlite3 *db) {
+      sqliteExecuteLiteralWithDB(db, "PRAGMA journal_mode = WAL;");
+      sqliteExecuteLiteralWithDB(
+          db,
+          "PRAGMA journal_size_limit = 6291456"); // 6Mb 1.5x default checkpoint
+                                                  // size
+      // Default to normal on all connections
+      sqliteExecuteLiteralWithDB(db, "PRAGMA synchronous = NORMAL;");
+    });
 
-    // Read connections
+    // Read connections WAL setup
     for (int i = 0; i < this->maxReads; i++) {
-      sqliteExecuteLiteralWithDB(this->readConnections[i].connection,
-                                 "PRAGMA synchronous = NORMAL;");
+      readConnections[i]->queueWork([](sqlite3 *db) {
+        sqliteExecuteLiteralWithDB(db, "PRAGMA synchronous = NORMAL;");
+      });
     }
   }
 };
 
-ConnectionPool::~ConnectionPool() {}
+ConnectionPool::~ConnectionPool() {
+  delete writeConnection;
+  for (auto con : readConnections) {
+    delete con;
+  }
+}
 
 void ConnectionPool::readLock(ConnectionLockId contextId) {
   // Maintain compatibility if no concurrent read connections are present
@@ -70,9 +63,9 @@ void ConnectionPool::readLock(ConnectionLockId contextId) {
   } else {
     // Check if there are open slots
     for (int i = 0; i < maxReads; i++) {
-      if (readConnections[i].currentLockId == EMPTY_LOCK_ID) {
+      if (readConnections[i]->isEmptyLock()) {
         // There is an open slot
-        activateContext(&readConnections[i], contextId);
+        activateContext(readConnections[i], contextId);
         return;
       }
     }
@@ -84,8 +77,8 @@ void ConnectionPool::readLock(ConnectionLockId contextId) {
 
 void ConnectionPool::writeLock(ConnectionLockId contextId) {
   // Check if there are any available read connections
-  if (writeConnection.currentLockId == EMPTY_LOCK_ID) {
-    activateContext(&writeConnection, contextId);
+  if (writeConnection->isEmptyLock()) {
+    activateContext(writeConnection, contextId);
     return;
   }
 
@@ -93,57 +86,34 @@ void ConnectionPool::writeLock(ConnectionLockId contextId) {
   writeQueue.push_back(contextId);
 }
 
-SQLiteOPResult ConnectionPool::executeInContext(
-    ConnectionLockId contextId, string const &query, vector<QuickValue> *params,
-    vector<map<string, QuickValue>> *results,
-    vector<QuickColumnMetadata> *metadata) {
-  sqlite3 *db = nullptr;
-  if (writeConnection.currentLockId == contextId) {
-    db = writeConnection.connection;
+SQLiteOPResult
+ConnectionPool::queueInContext(ConnectionLockId contextId,
+                               std::function<void(sqlite3 *)> task) {
+  ConnectionState *state = nullptr;
+  if (writeConnection->matchesLock(contextId)) {
+    state = writeConnection;
   } else {
     // Check if it's a read connection
     for (int i = 0; i < maxReads; i++) {
-      if (readConnections[i].currentLockId == contextId) {
-        db = readConnections[i].connection;
+      if (readConnections[i]->matchesLock(contextId)) {
+        state = readConnections[i];
         break;
       }
     }
   }
-  if (db == nullptr) {
-    // throw error that context is not available
+  if (state == nullptr) {
+    // return error that context is not available
     return SQLiteOPResult{
         .errorMessage = "Context is no longer available",
         .type = SQLiteError,
     };
   }
 
-  return sqliteExecuteWithDB(db, query, params, results, metadata);
-}
+  state->queueWork(task);
 
-SequelLiteralUpdateResult
-ConnectionPool::executeLiteralInContext(ConnectionLockId contextId,
-                                        string const &query) {
-  sqlite3 *db = nullptr;
-  if (writeConnection.currentLockId == contextId) {
-    db = writeConnection.connection;
-  } else {
-    // Check if it's a read connection
-    for (int i = 0; i < maxReads; i++) {
-      if (readConnections[i].currentLockId == contextId) {
-        db = readConnections[i].connection;
-        break;
-      }
-    }
-  }
-  if (db == nullptr) {
-    // throw error that context is not available
-    return SequelLiteralUpdateResult{
-        .type = SQLiteError,
-        .message = "Context is no longer available",
-    };
-  }
-
-  return sqliteExecuteLiteralWithDB(db, query);
+  return SQLiteOPResult{
+      .type = SQLiteOk,
+  };
 }
 
 void ConnectionPool::setOnContextAvailable(void (*callback)(std::string,
@@ -154,31 +124,31 @@ void ConnectionPool::setOnContextAvailable(void (*callback)(std::string,
 void ConnectionPool::setTableUpdateHandler(
     void (*callback)(void *, int, const char *, const char *, sqlite3_int64)) {
   // Only the write connection can make changes
-  sqlite3_update_hook(writeConnection.connection, callback,
+  sqlite3_update_hook(writeConnection->connection, callback,
                       (void *)(dbName.c_str()));
 }
 
 void ConnectionPool::closeContext(ConnectionLockId contextId) {
-  if (writeConnection.currentLockId == contextId) {
+  if (writeConnection->matchesLock(contextId)) {
     if (writeQueue.size() > 0) {
       // There are items in the queue, activate the next one
-      activateContext(&writeConnection, writeQueue[0]);
+      activateContext(writeConnection, writeQueue[0]);
       writeQueue.erase(writeQueue.begin());
     } else {
       // No items in the queue, clear the context
-      writeConnection.currentLockId = EMPTY_LOCK_ID;
+      writeConnection->clearLock();
     }
   } else {
     // Check if it's a read connection
     for (int i = 0; i < maxReads; i++) {
-      if (readConnections[i].currentLockId == contextId) {
+      if (readConnections[i]->matchesLock(contextId)) {
         if (readQueue.size() > 0) {
           // There are items in the queue, activate the next one
-          activateContext(&readConnections[i], readQueue[0]);
+          activateContext(readConnections[i], readQueue[0]);
           readQueue.erase(readQueue.begin());
         } else {
           // No items in the queue, clear the context
-          readConnections[i].currentLockId = EMPTY_LOCK_ID;
+          readConnections[i]->clearLock();
         }
         return;
       }
@@ -187,9 +157,9 @@ void ConnectionPool::closeContext(ConnectionLockId contextId) {
 }
 
 void ConnectionPool::closeAll() {
-  sqlite3_close_v2(writeConnection.connection);
+  writeConnection->close();
   for (int i = 0; i < maxReads; i++) {
-    sqlite3_close_v2(readConnections[i].connection);
+    readConnections[i]->close();
   }
 }
 
@@ -207,7 +177,7 @@ SQLiteOPResult ConnectionPool::attachDatabase(std::string const dbFileName,
   auto dbConnections = getAllConnections();
 
   for (auto &connectionState : dbConnections) {
-    if (connectionState.currentLockId != EMPTY_LOCK_ID) {
+    if (connectionState->isEmptyLock()) {
       return SQLiteOPResult{
           .type = SQLiteError,
           .errorMessage = dbName + " was unable to attach another database: " +
@@ -218,7 +188,7 @@ SQLiteOPResult ConnectionPool::attachDatabase(std::string const dbFileName,
 
   for (auto &connectionState : dbConnections) {
     SequelLiteralUpdateResult result =
-        sqliteExecuteLiteralWithDB(connectionState.connection, statement);
+        sqliteExecuteLiteralWithDB(connectionState->connection, statement);
     if (result.type == SQLiteError) {
       // Revert change on any successful connections
       detachDatabase(alias);
@@ -244,7 +214,7 @@ SQLiteOPResult ConnectionPool::detachDatabase(std::string const alias) {
   auto dbConnections = getAllConnections();
 
   for (auto &connectionState : dbConnections) {
-    if (connectionState.currentLockId != EMPTY_LOCK_ID) {
+    if (connectionState->isEmptyLock()) {
       return SQLiteOPResult{
           .type = SQLiteError,
           .errorMessage = dbName + " was unable to detach another database: " +
@@ -255,7 +225,7 @@ SQLiteOPResult ConnectionPool::detachDatabase(std::string const alias) {
 
   for (auto &connectionState : dbConnections) {
     SequelLiteralUpdateResult result =
-        sqliteExecuteLiteralWithDB(connectionState.connection, statement);
+        sqliteExecuteLiteralWithDB(connectionState->connection, statement);
     if (result.type == SQLiteError) {
       return SQLiteOPResult{
           .type = SQLiteError,
@@ -269,53 +239,10 @@ SQLiteOPResult ConnectionPool::detachDatabase(std::string const alias) {
   };
 }
 
-SequelBatchOperationResult
-ConnectionPool::importSQLFile(std::string fileLocation) {
-  std::string line;
-  std::ifstream sqFile(fileLocation);
-
-  if (sqFile.is_open()) {
-    sqlite3 *connection = writeConnection.connection;
-    try {
-      int affectedRows = 0;
-      int commands = 0;
-      sqliteExecuteLiteralWithDB(connection, "BEGIN EXCLUSIVE TRANSACTION");
-      while (std::getline(sqFile, line, '\n')) {
-        if (!line.empty()) {
-          SequelLiteralUpdateResult result =
-              sqliteExecuteLiteralWithDB(connection, line);
-          if (result.type == SQLiteError) {
-            sqliteExecuteLiteralWithDB(connection, "ROLLBACK");
-            sqFile.close();
-            return {SQLiteError, result.message, 0, commands};
-          } else {
-            affectedRows += result.affectedRows;
-            commands++;
-          }
-        }
-      }
-      sqFile.close();
-      sqliteExecuteLiteralWithDB(connection, "COMMIT");
-      return {SQLiteOk, "", affectedRows, commands};
-    } catch (...) {
-      sqFile.close();
-      sqliteExecuteLiteralWithDB(connection, "ROLLBACK");
-      return {SQLiteError,
-              "[react-native-quick-sqlite][loadSQLFile] Unexpected error, "
-              "transaction was rolledback",
-              0, 0};
-    }
-  } else {
-    return {SQLiteError,
-            "[react-native-quick-sqlite][loadSQLFile] Could not open file", 0,
-            0};
-  }
-}
-
 // ===================== Private ===============
 
-std::vector<ConnectionState> ConnectionPool::getAllConnections() {
-  std::vector<ConnectionState> result;
+std::vector<ConnectionState *> ConnectionPool::getAllConnections() {
+  std::vector<ConnectionState *> result;
   result.push_back(writeConnection);
   for (int i = 0; i < maxReads; i++) {
     result.push_back(readConnections[i]);
@@ -325,26 +252,9 @@ std::vector<ConnectionState> ConnectionPool::getAllConnections() {
 
 void ConnectionPool::activateContext(ConnectionState *state,
                                      ConnectionLockId contextId) {
-  state->currentLockId = contextId;
+  state->activateLock(contextId);
 
   if (onContextCallback != nullptr) {
     onContextCallback(dbName, contextId);
   }
-}
-
-SQLiteOPResult ConnectionPool::genericSqliteOpenDb(string const dbName,
-                                                   string const docPath,
-                                                   sqlite3 **db,
-                                                   int sqlOpenFlags) {
-  string dbPath = get_db_path(dbName, docPath);
-
-  int exit = 0;
-  exit = sqlite3_open_v2(dbPath.c_str(), db, sqlOpenFlags, nullptr);
-
-  if (exit != SQLITE_OK) {
-    return SQLiteOPResult{.type = SQLiteError,
-                          .errorMessage = sqlite3_errmsg(*db)};
-  }
-
-  return SQLiteOPResult{.type = SQLiteOk, .rowsAffected = 0};
 }

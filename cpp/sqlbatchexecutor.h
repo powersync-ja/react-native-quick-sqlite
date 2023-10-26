@@ -25,5 +25,7 @@ void jsiBatchParametersToQuickArguments(jsi::Runtime &rt,
  * Execute a batch of commands in a exclusive transaction
  */
 SequelBatchOperationResult
-sqliteExecuteBatch(std::string dbName, ConnectionLockId lockId,
-                   vector<QuickQueryArguments> *commands);
+sqliteExecuteBatch(sqlite3 *db, vector<QuickQueryArguments> *commands);
+
+SequelBatchOperationResult sqliteImportFile(sqlite3 *db,
+                                            std::string const file);
