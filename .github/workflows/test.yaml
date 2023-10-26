@@ -6,7 +6,7 @@ on:
 jobs:
   test:
     name: Test
-    runs-on: macos-latest
+    runs-on: macos-latest-large
     env:
       AVD_NAME: macOS-avd-x86_64-29
     steps:
