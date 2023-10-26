@@ -29,9 +29,14 @@ ConnectionState::~ConnectionState() {
   delete thread;
 }
 
-void ConnectionState::clearLock() { _currentLockId = EMPTY_LOCK_ID; }
+void ConnectionState::clearLock() {
+  if (!workQueue.empty()) {
+    waitFinished();
+  }
+  _currentLockId = EMPTY_LOCK_ID;
+}
 
-SQLiteOPResult ConnectionState::activateLock(const ConnectionLockId &lockId) {
+void ConnectionState::activateLock(const ConnectionLockId &lockId) {
   _currentLockId = lockId;
 }
 
@@ -42,7 +47,11 @@ bool ConnectionState::matchesLock(const ConnectionLockId &lockId) {
 bool ConnectionState::isEmptyLock() { return _currentLockId == EMPTY_LOCK_ID; }
 
 void ConnectionState::close() {
-  waitFinished();
+  if (!workQueue.empty()) {
+    waitFinished();
+  }
+  // So that the thread can stop (if not already)
+  threadDone = true;
   sqlite3_close_v2(connection);
 }
 
@@ -84,6 +93,7 @@ void ConnectionState::doWork() {
     task(connection);
     --threadBusy;
   }
+  workQueueConditionVariable.notify_all();
 }
 
 void ConnectionState::waitFinished() {

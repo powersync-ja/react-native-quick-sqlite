@@ -65,8 +65,8 @@ SQLiteOPResult sqliteCloseDb(string const dbName) {
   ConnectionPool *connection = dbMap[dbName];
 
   connection->closeAll();
-  delete connection;
   dbMap.erase(dbName);
+  delete connection;
 
   return SQLiteOPResult{
       .type = SQLiteOk,

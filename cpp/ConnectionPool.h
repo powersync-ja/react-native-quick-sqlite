@@ -51,8 +51,8 @@ class ConnectionPool {
 private:
   int maxReads;
   std::string dbName;
-  std::vector<ConnectionState *> readConnections;
-  ConnectionState *writeConnection;
+  ConnectionState **readConnections;
+  ConnectionState writeConnection;
 
   std::vector<ConnectionLockId> readQueue;
   std::vector<ConnectionLockId> writeQueue;
@@ -118,7 +118,7 @@ public:
 private:
   std::vector<ConnectionState *> getAllConnections();
 
-  void activateContext(ConnectionState *state, ConnectionLockId contextId);
+  void activateContext(ConnectionState &state, ConnectionLockId contextId);
 
   SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,
                                      sqlite3 **db, int sqlOpenFlags);

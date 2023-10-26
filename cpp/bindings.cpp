@@ -471,7 +471,7 @@ void osp::install(jsi::Runtime &rt,
   module.setProperty(rt, "open", move(open));
   module.setProperty(rt, "requestLock", move(requestLock));
   module.setProperty(rt, "releaseLock", move(releaseLock));
-  module.setProperty(rt, "executeInContextAsync", move(executeInContext));
+  module.setProperty(rt, "executeInContext", move(executeInContext));
   module.setProperty(rt, "close", move(close));
 
   module.setProperty(rt, "attach", move(attach));

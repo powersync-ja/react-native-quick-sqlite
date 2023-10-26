@@ -6,25 +6,24 @@
 
 ConnectionPool::ConnectionPool(std::string dbName, std::string docPath,
                                unsigned int numReadConnections)
-    : dbName(dbName), maxReads(numReadConnections) {
+    : dbName(dbName), maxReads(numReadConnections),
+      writeConnection(dbName, docPath,
+                      SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE |
+                          SQLITE_OPEN_FULLMUTEX) {
 
   onContextCallback = nullptr;
   isConcurrencyEnabled = maxReads > 0;
 
-  // Open the write connection
-  writeConnection = new ConnectionState(
-      dbName, docPath,
-      SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX);
-
+  readConnections = new ConnectionState *[maxReads];
   // Open the read connections
   for (int i = 0; i < maxReads; i++) {
-    readConnections.push_back(new ConnectionState(
-        dbName, docPath, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX));
+    readConnections[i] = new ConnectionState(
+        dbName, docPath, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX);
   }
 
   if (true == isConcurrencyEnabled) {
     // Write connection WAL setup
-    writeConnection->queueWork([](sqlite3 *db) {
+    writeConnection.queueWork([](sqlite3 *db) {
       sqliteExecuteLiteralWithDB(db, "PRAGMA journal_mode = WAL;");
       sqliteExecuteLiteralWithDB(
           db,
@@ -44,10 +43,10 @@ ConnectionPool::ConnectionPool(std::string dbName, std::string docPath,
 };
 
 ConnectionPool::~ConnectionPool() {
-  delete writeConnection;
-  for (auto con : readConnections) {
-    delete con;
+  for (int i = 0; i < maxReads; i++) {
+    delete readConnections[i];
   }
+  delete readConnections;
 }
 
 void ConnectionPool::readLock(ConnectionLockId contextId) {
@@ -65,7 +64,7 @@ void ConnectionPool::readLock(ConnectionLockId contextId) {
     for (int i = 0; i < maxReads; i++) {
       if (readConnections[i]->isEmptyLock()) {
         // There is an open slot
-        activateContext(readConnections[i], contextId);
+        activateContext(*readConnections[i], contextId);
         return;
       }
     }
@@ -77,7 +76,7 @@ void ConnectionPool::readLock(ConnectionLockId contextId) {
 
 void ConnectionPool::writeLock(ConnectionLockId contextId) {
   // Check if there are any available read connections
-  if (writeConnection->isEmptyLock()) {
+  if (writeConnection.isEmptyLock()) {
     activateContext(writeConnection, contextId);
     return;
   }
@@ -90,8 +89,8 @@ SQLiteOPResult
 ConnectionPool::queueInContext(ConnectionLockId contextId,
                                std::function<void(sqlite3 *)> task) {
   ConnectionState *state = nullptr;
-  if (writeConnection->matchesLock(contextId)) {
-    state = writeConnection;
+  if (writeConnection.matchesLock(contextId)) {
+    state = &writeConnection;
   } else {
     // Check if it's a read connection
     for (int i = 0; i < maxReads; i++) {
@@ -124,19 +123,19 @@ void ConnectionPool::setOnContextAvailable(void (*callback)(std::string,
 void ConnectionPool::setTableUpdateHandler(
     void (*callback)(void *, int, const char *, const char *, sqlite3_int64)) {
   // Only the write connection can make changes
-  sqlite3_update_hook(writeConnection->connection, callback,
+  sqlite3_update_hook(writeConnection.connection, callback,
                       (void *)(dbName.c_str()));
 }
 
 void ConnectionPool::closeContext(ConnectionLockId contextId) {
-  if (writeConnection->matchesLock(contextId)) {
+  if (writeConnection.matchesLock(contextId)) {
     if (writeQueue.size() > 0) {
       // There are items in the queue, activate the next one
       activateContext(writeConnection, writeQueue[0]);
       writeQueue.erase(writeQueue.begin());
     } else {
       // No items in the queue, clear the context
-      writeConnection->clearLock();
+      writeConnection.clearLock();
     }
   } else {
     // Check if it's a read connection
@@ -144,7 +143,7 @@ void ConnectionPool::closeContext(ConnectionLockId contextId) {
       if (readConnections[i]->matchesLock(contextId)) {
         if (readQueue.size() > 0) {
           // There are items in the queue, activate the next one
-          activateContext(readConnections[i], readQueue[0]);
+          activateContext(*readConnections[i], readQueue[0]);
           readQueue.erase(readQueue.begin());
         } else {
           // No items in the queue, clear the context
@@ -157,7 +156,7 @@ void ConnectionPool::closeContext(ConnectionLockId contextId) {
 }
 
 void ConnectionPool::closeAll() {
-  writeConnection->close();
+  writeConnection.close();
   for (int i = 0; i < maxReads; i++) {
     readConnections[i]->close();
   }
@@ -177,7 +176,7 @@ SQLiteOPResult ConnectionPool::attachDatabase(std::string const dbFileName,
   auto dbConnections = getAllConnections();
 
   for (auto &connectionState : dbConnections) {
-    if (connectionState->isEmptyLock()) {
+    if (!connectionState->isEmptyLock()) {
       return SQLiteOPResult{
           .type = SQLiteError,
           .errorMessage = dbName + " was unable to attach another database: " +
@@ -214,7 +213,7 @@ SQLiteOPResult ConnectionPool::detachDatabase(std::string const alias) {
   auto dbConnections = getAllConnections();
 
   for (auto &connectionState : dbConnections) {
-    if (connectionState->isEmptyLock()) {
+    if (!connectionState->isEmptyLock()) {
       return SQLiteOPResult{
           .type = SQLiteError,
           .errorMessage = dbName + " was unable to detach another database: " +
@@ -243,16 +242,16 @@ SQLiteOPResult ConnectionPool::detachDatabase(std::string const alias) {
 
 std::vector<ConnectionState *> ConnectionPool::getAllConnections() {
   std::vector<ConnectionState *> result;
-  result.push_back(writeConnection);
+  result.push_back(&writeConnection);
   for (int i = 0; i < maxReads; i++) {
     result.push_back(readConnections[i]);
   }
   return result;
 }
 
-void ConnectionPool::activateContext(ConnectionState *state,
+void ConnectionPool::activateContext(ConnectionState &state,
                                      ConnectionLockId contextId) {
-  state->activateLock(contextId);
+  state.activateLock(contextId);
 
   if (onContextCallback != nullptr) {
     onContextCallback(dbName, contextId);

@@ -37,7 +37,7 @@ public:
   ~ConnectionState();
 
   void clearLock();
-  SQLiteOPResult activateLock(const ConnectionLockId &lockId);
+  void activateLock(const ConnectionLockId &lockId);
   bool matchesLock(const ConnectionLockId &lockId);
   bool isEmptyLock();
 
