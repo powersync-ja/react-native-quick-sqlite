@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 0.0.2
+
+### Patch Changes
+
+- c17f91c: Added concurrent read/write connection support.
+
 ## 0.0.1
 
 ### Patch Changes
