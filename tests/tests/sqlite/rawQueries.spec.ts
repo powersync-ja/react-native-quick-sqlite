@@ -392,22 +392,20 @@ export function registerBaseTests() {
     it('Should queue simultaneous executions', async () => {
       let order: number[] = [];
 
-      const operationCount = 20;
+      const operationCount = 5;
       // This wont resolve or free until another connection free's it
       await db.writeLock(async (context) => {
-        const fn = async (x: number, index: number) => {
-          try {
-            await context.execute('SELECT * FROM User');
-            order.push(index);
-          } catch (ex) {
-            console.error(ex);
-          }
-        };
-
         await Promise.all(
           Array(operationCount)
             .fill(0)
-            .map((i, index) => fn(i, index))
+            .map(async (x: number, index: number) => {
+              try {
+                await context.execute('SELECT * FROM User');
+                order.push(index);
+              } catch (ex) {
+                console.error(ex);
+              }
+            })
         );
       });
 

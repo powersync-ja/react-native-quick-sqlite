@@ -11,6 +11,7 @@ export default function App() {
   const [results, setResults] = useState<any>([]);
 
   useEffect(() => {
+    console.log('Running Tests:');
     setResults([]);
     runTests(registerBaseTests).then((results) => {
       // Send results to host server
@@ -19,6 +20,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(results)
       });
+      console.log(JSON.stringify(results, null, '\t'));
       setResults(results);
     });
   }, []);
