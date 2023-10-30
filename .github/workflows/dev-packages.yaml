@@ -24,13 +24,12 @@ jobs:
           echo "Yarn version: $(yarn -v)"
           echo "//registry.npmjs.org/:_authToken=${{secrets.NPM_TOKEN}}" >> ~/.npmrc
 
+        # This also builds the package as part of the post install
       - name: Install Dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Build
-        run: yarn build
-
       - name: Development Version
         run: |
+          node ./scripts/dev-package-pre-version.js
           yarn changeset version --no-git-tag --snapshot dev
           yarn changeset publish --tag dev

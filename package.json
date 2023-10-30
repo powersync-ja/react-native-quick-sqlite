@@ -8,7 +8,7 @@
   "description": "Fast SQLite for react-native",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
-  "types": "lib/typescript/index.d.ts",
+  "types": "lib/typescript/src/index.d.ts",
   "react-native": "src/index",
   "source": "src/index",
   "files": [
@@ -19,7 +19,6 @@
     "cpp",
     "meta.json",
     "react-native-quick-sqlite.podspec",
-    "!lib/typescript/example",
     "!android/build",
     "!android/.cxx",
     "!ios/build",
@@ -32,11 +31,8 @@
     "clean": "rm -rf lib tsconfig.tsbuildinfo",
     "typescript": "tsc --noEmit",
     "prepare": "bob build",
-    "preversion": "node ./scripts/dev-package-version.js $npm_package_version",
     "example": "yarn --cwd example",
-    "pods": "cd example/ios && bundle exec pod install",
-    "bootstrap": "yarn example && yarn && yarn pods",
-    "release": "yarn build && yarn changeset publish"
+    "release": "yarn changeset publish"
   },
   "keywords": [
     "react-native",
@@ -52,9 +48,11 @@
   "homepage": "https://github.com/margelo/react-native-quick-sqlite#readme",
   "devDependencies": {
     "@changesets/cli": "^2.26.2",
-    "react-native-builder-bob": "^0.18.2",
-    "react-native": "0.71.0",
+    "@types/lodash": "^4.14.200",
+    "@types/uuid": "3.4.0",
     "react": "18.2.0",
+    "react-native": "0.71.0",
+    "react-native-builder-bob": "^0.18.2",
     "typescript": "^4.8.4"
   },
   "peerDependencies": {
@@ -77,10 +75,12 @@
       [
         "typescript",
         {
-          "project": "tsconfig.build.json"
+          "project": "tsconfig.json"
         }
       ]
     ]
   },
-  "dependencies": {}
+  "dependencies": {
+    "lodash": "^4.17.21"
+  }
 }

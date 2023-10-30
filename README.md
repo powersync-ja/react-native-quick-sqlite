@@ -27,29 +27,41 @@ TypeORM is officially supported, however, there is currently a parsing issue wit
 
 ## API
 
-```typescript
+```Typescript
 import {open} from 'react-native-quick-sqlite'
 
-const db = open('myDb.sqlite')
+const db: {
+  close: () => void;
+  execute: (sql: string, args?: any[]) => Promise<QueryResult>;
+  readLock: <T>(callback: (context: LockContext) => Promise<T>, options?: LockOptions) => Promise<T>;
+  readTransaction: <T>(callback: (context: TransactionContext) => Promise<T>, options?: LockOptions) => Promise<T>;
+  writeLock: <T>(callback: (context: LockContext) => Promise<T>, options?: LockOptions) => Promise<T>;
+  writeTransaction: <T>(callback: (context: TransactionContext) => Promise<T>, options?: LockOptions) => Promise<T>;
+  delete: () => void;
+  attach: (dbNameToAttach: string, alias: string, location?: string) => void;
+  detach: (alias: string) => void;
+  executeBatchAsync: (commands: SQLBatchTuple[]) => Promise<BatchQueryResult>;
+  loadFileAsync: (location: string) => Promise<FileLoadResult>;
+  /**
+   * Note that only one listener can be registered per database connection.
+   * Any new hook registration will override the previous one.
+   */
+  registerUpdateHook(callback: UpdateCallback): void;
+} = open('myDb.sqlite');
+```
 
-// The db object now contains the following methods:
 
-db = {
-  close: () => void,
-  delete: () => void,
-  attach: (dbNameToAttach: string, alias: string, location?: string) => void,
-  detach: (alias: string) => void,
-  transaction: (fn: (tx: Transaction) => void) => Promise<void>,
-  execute: (query: string, params?: any[]) => QueryResult,
-  executeAsync: (
-    query: string,
-    params?: any[]
-  ) => Promise<QueryResult>,
-  executeBatch: (commands: SQLBatchParams[]) => BatchQueryResult,
-  executeBatchAsync: (commands: SQLBatchParams[]) => Promise<BatchQueryResult>,
-  loadFile: (location: string) => FileLoadResult;,
-  loadFileAsync: (location: string) => Promise<FileLoadResult>
-}
+### Concurrency
+By default connections support concurrent read and write locks/transactions. This is achieved by opening the DB in WAL mode. The default of 4 readonly connections and a single write connection are opened. The read and write connections can be used concurrently. 
+Attempting to open more locks than the available connections will result in lock callbacks being queued until connections are free.
+
+See this [blog post](https://www.powersync.co/blog/sqlite-optimizations-for-ultra-high-performance),
+explaining why these features are important for using SQLite.
+
+Concurrency can be disabled, resulting in a single write connection by setting the number of read connections to zero.
+
+``` Javascript
+const db = open('test.db', {numReadConnections: 0});
 ```
 
 ### Simple queries
@@ -86,7 +98,7 @@ Throwing an error inside the callback will ROLLBACK the transaction.
 If you want to execute a large set of commands as fast as possible you should use the `executeBatch` method, it wraps all the commands in a transaction and has less overhead.
 
 ```typescript
-await QuickSQLite.transaction('myDatabase', (tx) => {
+await QuickSQLite.transaction('myDatabase', async (tx) => {
   const { status } = tx.execute(
     'UPDATE sometable SET somecolumn = ? where somekey = ?',
     [0, 1]
@@ -327,6 +339,7 @@ quickSqliteFlags="<SQLITE_FLAGS>"
 On iOS, the SQLite database can be placed in an app group, in order to make it accessible from other apps in that app group. E.g. for sharing capabilities.
 
 To use an app group, add the app group ID as the value for the `ReactNativeQuickSQLite_AppGroup` key in your project's `Info.plist` file. You'll also need to configure the app group in your project settings. (Xcode -> Project Settings -> Signing & Capabilities -> Add Capability -> App Groups)
+
 
 ## Community Discord
 
