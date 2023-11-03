@@ -389,32 +389,32 @@ export function registerBaseTests() {
       expect(result).to.equal(42);
     });
 
-    // it('Should queue simultaneous executions', async () => {
-    //   let order: number[] = [];
+    it('Should queue simultaneous executions', async () => {
+      let order: number[] = [];
 
-    //   const operationCount = 5;
-    //   // This wont resolve or free until another connection free's it
-    //   await db.writeLock(async (context) => {
-    //     await Promise.all(
-    //       Array(operationCount)
-    //         .fill(0)
-    //         .map(async (x: number, index: number) => {
-    //           try {
-    //             await context.execute('SELECT * FROM User');
-    //             order.push(index);
-    //           } catch (ex) {
-    //             console.error(ex);
-    //           }
-    //         })
-    //     );
-    //   });
+      const operationCount = 5;
+      // This wont resolve or free until another connection free's it
+      await db.writeLock(async (context) => {
+        await Promise.all(
+          Array(operationCount)
+            .fill(0)
+            .map(async (x: number, index: number) => {
+              try {
+                await context.execute('SELECT * FROM User');
+                order.push(index);
+              } catch (ex) {
+                console.error(ex);
+              }
+            })
+        );
+      });
 
-    //   expect(order).to.deep.equal(
-    //     Array(operationCount)
-    //       .fill(0)
-    //       .map((x, index) => index)
-    //   );
-    // });
+      expect(order).to.deep.equal(
+        Array(operationCount)
+          .fill(0)
+          .map((x, index) => index)
+      );
+    });
 
     it('Should call update hook on changes', async () => {
       const result = new Promise<UpdateNotification>((resolve) => db.registerUpdateHook((update) => resolve(update)));
