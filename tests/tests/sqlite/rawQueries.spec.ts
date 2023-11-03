@@ -157,7 +157,7 @@ export function registerBaseTests() {
 
       await db.writeTransaction(async (tx) => {
         await tx.execute('INSERT INTO "User" (id, name, age, networth) VALUES(?, ?, ?, ?)', [id, name, age, networth]);
-        tx.commit();
+        await tx.commit();
       });
 
       const res = await db.execute('SELECT * FROM User');
@@ -176,6 +176,24 @@ export function registerBaseTests() {
 
       await db.writeTransaction(async (tx) => {
         await tx.execute('INSERT INTO "User" (id, name, age, networth) VALUES(?, ?, ?, ?)', [id, name, age, networth]);
+        await tx.rollback();
+      });
+
+      const res = await db.execute('SELECT * FROM User');
+      expect(res.rows?._array).to.eql([]);
+    });
+
+    /**
+     * The lock manager will attempt to free the connection lock
+     * as soon as the callback resolves, but it should also
+     * correctly await any queued work such as tx.rollback();
+     */
+    it('Transaction, manual rollback, forgot await', async () => {
+      const { id, name, age, networth } = generateUserInfo();
+
+      await db.writeTransaction(async (tx) => {
+        await tx.execute('INSERT INTO "User" (id, name, age, networth) VALUES(?, ?, ?, ?)', [id, name, age, networth]);
+        // Purposely forget await to this.
         tx.rollback();
       });
 

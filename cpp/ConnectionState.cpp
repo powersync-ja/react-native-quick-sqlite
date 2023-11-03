@@ -92,8 +92,10 @@ void ConnectionState::doWork() {
     ++threadBusy;
     task(connection);
     --threadBusy;
+    // Need to notify in order for waitFinished to be updated when
+    // the queue is empty and not busy
+    workQueueConditionVariable.notify_all();
   }
-  workQueueConditionVariable.notify_all();
 }
 
 void ConnectionState::waitFinished() {
