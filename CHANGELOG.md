@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 0.1.1
+
+### Patch Changes
+
+- 2802916: Fixed: Missing dependency for `uuid` and race condition where ommitting `await` on some lock/transaction operations could deadlock the application's main thread.
+
 ## 0.1.0
 
 ### Minor Changes
