@@ -10,19 +10,39 @@ const TEST_SERVER_URL = 'http://localhost:4243/results';
 export default function App() {
   const [results, setResults] = useState<any>([]);
 
-  useEffect(() => {
-    console.log('Running Tests:');
+  const executeTests = React.useCallback(async () => {
     setResults([]);
-    runTests(registerBaseTests).then((results) => {
+
+    try {
+      const results = await runTests(registerBaseTests);
+
       // Send results to host server
-      fetch(TEST_SERVER_URL, {
+      await fetch(TEST_SERVER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(results)
       });
       console.log(JSON.stringify(results, null, '\t'));
       setResults(results);
-    });
+    } catch (ex) {
+      console.error(ex);
+      // Send results to host server
+      fetch(TEST_SERVER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([
+          {
+            description: `Caught exception: ${ex}`,
+            type: 'incorrect'
+          }
+        ])
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    console.log('Running Tests:');
+    executeTests();
   }, []);
 
   return (
