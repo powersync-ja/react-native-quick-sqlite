@@ -157,7 +157,7 @@ export function registerBaseTests() {
 
       await db.writeTransaction(async (tx) => {
         await tx.execute('INSERT INTO "User" (id, name, age, networth) VALUES(?, ?, ?, ?)', [id, name, age, networth]);
-        tx.commit();
+        await tx.commit();
       });
 
       const res = await db.execute('SELECT * FROM User');
@@ -176,7 +176,7 @@ export function registerBaseTests() {
 
       await db.writeTransaction(async (tx) => {
         await tx.execute('INSERT INTO "User" (id, name, age, networth) VALUES(?, ?, ?, ?)', [id, name, age, networth]);
-        tx.rollback();
+        await tx.rollback();
       });
 
       const res = await db.execute('SELECT * FROM User');
