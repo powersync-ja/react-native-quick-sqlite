@@ -193,7 +193,7 @@ export function registerBaseTests() {
 
       await db.writeTransaction(async (tx) => {
         await tx.execute('INSERT INTO "User" (id, name, age, networth) VALUES(?, ?, ?, ?)', [id, name, age, networth]);
-        // Purposely forget await this.
+        // Purposely forget await to this.
         tx.rollback();
       });
 
