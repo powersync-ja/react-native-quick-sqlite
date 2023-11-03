@@ -15,15 +15,14 @@ export default function App() {
 
     try {
       const results = await runTests(registerBaseTests);
-
+      console.log(JSON.stringify(results, null, '\t'));
+      setResults(results);
       // Send results to host server
       await fetch(TEST_SERVER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(results)
       });
-      console.log(JSON.stringify(results, null, '\t'));
-      setResults(results);
     } catch (ex) {
       console.error(ex);
       // Send results to host server
