@@ -1,6 +1,3 @@
-# Beta
-This package is currently in a beta release.
-
 ![screenshot](https://raw.githubusercontent.com/margelo/react-native-quick-sqlite/main/header2.png)
 
 <div align="center">
