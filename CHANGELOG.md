@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 1.0.0
+
+### Major Changes
+
+- 7c54e8a: Version 1.0.0 release out of beta
+
 ## 0.1.1
 
 ### Patch Changes
