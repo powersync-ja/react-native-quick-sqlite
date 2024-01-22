@@ -26,7 +26,7 @@ function createTestUser(context: { execute: (sql: string, args?: any[]) => Promi
   return context.execute('INSERT INTO "User" (id, name, age, networth) VALUES(?, ?, ?, ?)', [id, name, age, networth]);
 }
 
-const NUM_READ_CONNECTIONS = 5;
+const NUM_READ_CONNECTIONS = 3;
 
 export function registerBaseTests() {
   beforeEach(async () => {
