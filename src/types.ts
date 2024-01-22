@@ -1,3 +1,5 @@
+import { DBListenerManager } from './DBListenerManager';
+
 /**
  * Object returned by SQL Query executions {
  *  insertId: Represent the auto-generated row id if applicable
@@ -76,6 +78,11 @@ export interface UpdateNotification {
   opType: RowUpdateType;
   table: string;
   rowId: number;
+  /**
+   * If this change ocurred during a write transaction which has not been
+   * committed yet.
+   */
+  pendingCommit?: boolean;
 }
 
 export type UpdateCallback = (update: UpdateNotification) => void;
@@ -149,8 +156,9 @@ export type QuickSQLiteConnection = {
   executeBatch: (commands: SQLBatchTuple[]) => Promise<BatchQueryResult>;
   loadFile: (location: string) => Promise<FileLoadResult>;
   /**
-   * Note that only one listener can be registered per database connection.
-   * Any new hook registration will override the previous one.
+   * @deprecated
+   * Use listenerManager instead
    */
   registerUpdateHook(callback: UpdateCallback): void;
+  listenerManager: DBListenerManager;
 };

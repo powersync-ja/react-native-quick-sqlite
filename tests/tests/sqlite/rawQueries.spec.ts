@@ -1,5 +1,12 @@
 import Chance from 'chance';
-import { open, QuickSQLite, QuickSQLiteConnection, SQLBatchTuple, UpdateNotification } from 'react-native-quick-sqlite';
+import {
+  open,
+  QueryResult,
+  QuickSQLite,
+  QuickSQLiteConnection,
+  SQLBatchTuple,
+  UpdateNotification
+} from 'react-native-quick-sqlite';
 import { beforeEach, describe, it } from '../mocha/MochaRNAdapter';
 import chai from 'chai';
 
@@ -14,6 +21,13 @@ function generateUserInfo() {
   return { id: chance.integer(), name: chance.name(), age: chance.integer(), networth: chance.floating() };
 }
 
+function createTestUser(context: { execute: (sql: string, args?: any[]) => Promise<QueryResult> } = db) {
+  const { id, name, age, networth } = generateUserInfo();
+  return context.execute('INSERT INTO "User" (id, name, age, networth) VALUES(?, ?, ?, ?)', [id, name, age, networth]);
+}
+
+const NUM_READ_CONNECTIONS = 5;
+
 export function registerBaseTests() {
   beforeEach(async () => {
     try {
@@ -22,7 +36,7 @@ export function registerBaseTests() {
         db.delete();
       }
 
-      global.db = db = open('test');
+      global.db = db = open('test', { numReadConnections: NUM_READ_CONNECTIONS });
 
       await db.execute('DROP TABLE IF EXISTS User; ');
       await db.execute('CREATE TABLE User ( id INT PRIMARY KEY, name TEXT NOT NULL, age INT, networth REAL) STRICT;');
@@ -33,13 +47,7 @@ export function registerBaseTests() {
 
   describe('Raw queries', () => {
     it('Insert', async () => {
-      const { id, name, age, networth } = generateUserInfo();
-      const res = await db.execute('INSERT INTO "User" (id, name, age, networth) VALUES(?, ?, ?, ?)', [
-        id,
-        name,
-        age,
-        networth
-      ]);
+      const res = await createTestUser();
       expect(res.rowsAffected).to.equal(1);
       expect(res.insertId).to.equal(1);
       expect(res.metadata).to.eql([]);
@@ -462,6 +470,64 @@ export function registerBaseTests() {
       expect((await p2).message).to.include('timed out');
 
       singleConnection.close();
+    });
+
+    it('Should reflect writeLock and writeTransaction updates on read connections', async () => {
+      let readTriggerCallbacks = [];
+
+      // Execute the read test whenever a table change ocurred
+      db.listenerManager.registerListener({
+        tableUpdated: () => {
+          readTriggerCallbacks.forEach((cb) => cb());
+        }
+      });
+
+      const createReaders = () =>
+        new Array(NUM_READ_CONNECTIONS).fill(null).map(() => {
+          return db.readLock(async (tx) => {
+            return new Promise<number>((resolve) => {
+              // start a read lock for each connection
+              readTriggerCallbacks.push(async () => {
+                const result = await tx.execute('SELECT * from User');
+                if (result.rows?.length) {
+                  // The data reflected on the read connection
+                  resolve(result.rows?.length);
+                }
+              });
+            });
+          });
+        });
+
+      // Test writeTransaction
+      let readerPromises = createReaders();
+
+      await db.writeTransaction(async (tx) => {
+        return createTestUser(tx);
+      });
+
+      let resolved = await Promise.all(readerPromises);
+      // The query result length for 1 item should be returned for all connections
+      expect(resolved, 'writeTransaction changes should reflect in read connections').to.deep.equal(
+        readerPromises.map(() => 1)
+      );
+
+      await db.execute('DELETE FROM User');
+
+      // Test writeLock
+      readerPromises = createReaders();
+      readTriggerCallbacks = [];
+
+      await db.writeLock(async (tx) => {
+        await tx.execute('BEGIN');
+        await createTestUser(tx);
+        await tx.execute('COMMIT');
+      });
+
+      resolved = await Promise.all(readerPromises);
+      // The query result length for 1 item should be returned for all connections
+      expect(resolved, 'writeLock changes should reflect in read connections').to.deep.equal(
+        readerPromises.map(() => 1)
+      );
     });
 
     it('Should attach DBs', async () => {
