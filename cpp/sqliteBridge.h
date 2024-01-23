@@ -29,6 +29,8 @@ sqliteOpenDb(std::string const dbName, std::string const docPath,
              void (*contextAvailableCallback)(std::string, ConnectionLockId),
              void (*updateTableCallback)(void *, int, const char *,
                                          const char *, sqlite3_int64),
+             void (*onTransactionFinalizedCallback)(
+                 const TransactionCallbackPayload *event),
              uint32_t numReadConnections);
 
 SQLiteOPResult sqliteCloseDb(string const dbName);

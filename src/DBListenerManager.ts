@@ -1,26 +1,26 @@
 import _ from 'lodash';
-import { registerUpdateHook } from './table-updates';
-import { UpdateCallback, UpdateNotification } from './types';
+import { registerTransactionHook, registerUpdateHook } from './table-updates';
+import {
+  BatchedUpdateCallback,
+  BatchedUpdateNotification,
+  TransactionEvent,
+  UpdateCallback,
+  UpdateNotification
+} from './types';
 import { BaseListener, BaseObserver } from './utils/BaseObserver';
 
 export interface DBListenerManagerOptions {
   dbName: string;
 }
 
-export enum WriteTransactionEventType {
-  STARTED = 'started',
-  COMMIT = 'commit',
-  ROLLBACK = 'rollback'
-}
-
 export interface WriteTransactionEvent {
-  type: WriteTransactionEventType;
+  type: TransactionEvent;
 }
 
 export interface DBListener extends BaseListener {
   /**
    * Register a listener to be fired for any table change.
-   * Changes inside write transactions are reported immediately.
+   * Changes inside write locks and transactions are reported immediately.
    */
   rawTableChange: UpdateCallback;
 
@@ -28,12 +28,12 @@ export interface DBListener extends BaseListener {
    * Register a listener for when table changes are persisted
    * into the DB. Changes during write transactions which are
    * rolled back are not reported.
-   * Any changes during write transactions are buffered and reported
-   * after commit.
+   * Any changes during write locks are buffered and reported
+   * after transaction commit and lock release.
    * Table changes are reported individually for now in order to maintain
    * API compatibility. These can be batched in future.
    */
-  tableUpdated: UpdateCallback;
+  tablesUpdated: BatchedUpdateCallback;
 
   /**
    * Listener event triggered whenever a write transaction
@@ -45,52 +45,56 @@ export interface DBListener extends BaseListener {
 export class DBListenerManager extends BaseObserver<DBListener> {}
 
 export class DBListenerManagerInternal extends DBListenerManager {
-  private _writeTransactionActive: boolean;
   private updateBuffer: UpdateNotification[];
-
-  get writeTransactionActive() {
-    return this._writeTransactionActive;
-  }
 
   constructor(protected options: DBListenerManagerOptions) {
     super();
-    this._writeTransactionActive = false;
     this.updateBuffer = [];
     registerUpdateHook(this.options.dbName, (update) => this.handleTableUpdates(update));
-  }
+    registerTransactionHook(this.options.dbName, (eventType) => {
+      switch (eventType) {
+        case TransactionEvent.COMMIT:
+          this.flushUpdates();
+          break;
+        case TransactionEvent.ROLLBACK:
+          this.transactionReverted();
+          break;
+      }
 
-  transactionStarted() {
-    this._writeTransactionActive = true;
-    this.iterateListeners((l) => l?.writeTransaction?.({ type: WriteTransactionEventType.STARTED }));
-  }
-
-  transactionCommitted() {
-    this._writeTransactionActive = false;
-    // flush updates
-    const uniqueUpdates = _.uniq(this.updateBuffer);
-    this.updateBuffer = [];
-    this.iterateListeners((l) => {
-      l.writeTransaction?.({ type: WriteTransactionEventType.COMMIT });
-      uniqueUpdates.forEach((update) => l.tableUpdated?.(update));
+      this.iterateListeners((l) =>
+        l.writeTransaction?.({
+          type: eventType
+        })
+      );
     });
   }
 
-  transactionReverted() {
-    this._writeTransactionActive = false;
+  flushUpdates() {
+    console.log('updates', this.updateBuffer);
+    if (!this.updateBuffer.length) {
+      return;
+    }
+
+    const groupedUpdates = _.groupBy(this.updateBuffer, (update) => update.table);
+    const batchedUpdate: BatchedUpdateNotification = {
+      groupedUpdates,
+      rawUpdates: this.updateBuffer,
+      tables: _.keys(groupedUpdates)
+    };
+    this.updateBuffer = [];
+    this.iterateListeners((l) => l.tablesUpdated?.(batchedUpdate));
+  }
+
+  protected transactionReverted() {
     // clear updates
     this.updateBuffer = [];
-    this.iterateListeners((l) => l?.writeTransaction?.({ type: WriteTransactionEventType.ROLLBACK }));
   }
 
   handleTableUpdates(notification: UpdateNotification) {
     // Fire updates for any change
-    this.iterateListeners((l) => l.rawTableChange?.({ ...notification, pendingCommit: this._writeTransactionActive }));
+    this.iterateListeners((l) => l.rawTableChange?.({ ...notification }));
 
-    if (this.writeTransactionActive) {
-      this.updateBuffer.push(notification);
-      return;
-    }
-
-    this.iterateListeners((l) => l.tableUpdated?.(notification));
+    // Queue changes until they are flushed
+    this.updateBuffer.push(notification);
   }
 }

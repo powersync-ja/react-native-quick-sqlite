@@ -9,7 +9,13 @@ ConnectionPool::ConnectionPool(std::string dbName, std::string docPath,
     : dbName(dbName), maxReads(numReadConnections),
       writeConnection(dbName, docPath,
                       SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE |
-                          SQLITE_OPEN_FULLMUTEX) {
+                          SQLITE_OPEN_FULLMUTEX),
+      commitPayload(
+          {.dbName = &this->dbName, .event = TransactionEvent::COMMIT}),
+      rollbackPayload({
+          .dbName = &this->dbName,
+          .event = TransactionEvent::ROLLBACK,
+      }) {
 
   onContextCallback = nullptr;
   isConcurrencyEnabled = maxReads > 0;
@@ -125,6 +131,26 @@ void ConnectionPool::setTableUpdateHandler(
   // Only the write connection can make changes
   sqlite3_update_hook(writeConnection.connection, callback,
                       (void *)(dbName.c_str()));
+}
+
+/**
+ * The SQLite callback needs to return `0` in order for the commit to
+ * proceed correctly
+ */
+int onCommitIntermediate(ConnectionPool *pool) {
+  if (pool->onCommitCallback != NULL) {
+    pool->onCommitCallback(&(pool->commitPayload));
+  }
+  return 0;
+}
+
+void ConnectionPool::setTransactionFinalizerHandler(
+    void (*callback)(const TransactionCallbackPayload *)) {
+  this->onCommitCallback = callback;
+  sqlite3_commit_hook(writeConnection.connection,
+                      (int (*)(void *))onCommitIntermediate, (void *)this);
+  sqlite3_rollback_hook(writeConnection.connection, (void (*)(void *))callback,
+                        (void *)&rollbackPayload);
 }
 
 void ConnectionPool::closeContext(ConnectionLockId contextId) {

@@ -74,18 +74,30 @@ export enum RowUpdateType {
   SQLITE_DELETE = 9,
   SQLITE_UPDATE = 23
 }
-export interface UpdateNotification {
+
+export interface TableUpdateOperation {
   opType: RowUpdateType;
-  table: string;
   rowId: number;
-  /**
-   * If this change ocurred during a write transaction which has not been
-   * committed yet.
-   */
-  pendingCommit?: boolean;
+}
+export interface UpdateNotification extends TableUpdateOperation {
+  table: string;
+}
+
+export interface BatchedUpdateNotification {
+  rawUpdates: UpdateNotification[];
+  tables: string[];
+  groupedUpdates: Record<string, TableUpdateOperation[]>;
 }
 
 export type UpdateCallback = (update: UpdateNotification) => void;
+export type BatchedUpdateCallback = (update: BatchedUpdateNotification) => void;
+
+export enum TransactionEvent {
+  COMMIT,
+  ROLLBACK
+}
+
+export type TransactionCallback = (eventType: TransactionEvent) => void;
 
 export type ContextLockID = string;
 
@@ -156,9 +168,22 @@ export type QuickSQLiteConnection = {
   executeBatch: (commands: SQLBatchTuple[]) => Promise<BatchQueryResult>;
   loadFile: (location: string) => Promise<FileLoadResult>;
   /**
-   * @deprecated
-   * Use listenerManager instead
+   * Register a callback which will be fired for each ROWID table change event.
+   * Table changes are reported immediately.
+   * Changes might not yet be committed if using a transaction.
+   *  - Listen to transaction events in listenerManager if extra logic is required
+   * For most use cases use `` instead.
+   * @returns a function which will deregister the callback
    */
-  registerUpdateHook(callback: UpdateCallback): void;
+  registerUpdateHook(callback: UpdateCallback): () => void;
+  /**
+   * Register a callback which will be fired whenever a change to a ROWID table
+   * has been committed.
+   * Changes inside write locks will be buffered until the lock is released or
+   * if a transaction inside the lock has been committed.
+   * Reverting a transaction inside a write lock will not fire table updates.
+   * @returns a function which will deregister the callback
+   */
+  registerTablesChangedHook(callback: BatchedUpdateCallback): () => void;
   listenerManager: DBListenerManager;
 };

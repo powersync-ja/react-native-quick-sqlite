@@ -16,7 +16,7 @@ import uuid from 'uuid';
 import _ from 'lodash';
 import { enhanceQueryResult } from './utils';
 import { DBListenerManagerInternal } from './DBListenerManager';
-import { LockHooks, TransactionHooks } from './lock-hooks';
+import { LockHooks } from './lock-hooks';
 
 type LockCallbackRecord = {
   callback: (context: LockContext) => Promise<any>;
@@ -117,14 +117,7 @@ export function setupOpen(QuickSQLite: ISQLite) {
             callback: async (context: LockContext) => {
               try {
                 await hooks?.lockAcquired?.();
-                const res = await callback({
-                  ...context,
-                  execute: async (sql, args) => {
-                    const result = await context.execute(sql, args);
-                    await hooks?.execute?.(sql, args);
-                    return result;
-                  }
-                });
+                const res = await callback(context);
 
                 // Ensure that we only resolve after locks are freed
                 _.defer(() => resolve(res));
@@ -157,20 +150,20 @@ export function setupOpen(QuickSQLite: ISQLite) {
       const readLock = <T>(callback: (context: LockContext) => Promise<T>, options?: LockOptions): Promise<T> =>
         requestLock(ConcurrentLockType.READ, callback, options);
 
-      const writeLock = <T>(
-        callback: (context: LockContext) => Promise<T>,
-        options?: LockOptions,
-        hooks?: LockHooks
-      ): Promise<T> => requestLock(ConcurrentLockType.WRITE, callback, options, hooks);
+      const writeLock = <T>(callback: (context: LockContext) => Promise<T>, options?: LockOptions): Promise<T> =>
+        requestLock(ConcurrentLockType.WRITE, callback, options, {
+          lockReleased: async () => {
+            // flush updates once a write lock has been released
+            listenerManager.flushUpdates();
+          }
+        });
 
       const wrapTransaction = async <T>(
         context: LockContext,
         callback: (context: TransactionContext) => Promise<T>,
-        defaultFinalizer: TransactionFinalizer = TransactionFinalizer.COMMIT,
-        hooks?: TransactionHooks
+        defaultFinalizer: TransactionFinalizer = TransactionFinalizer.COMMIT
       ) => {
         await context.execute('BEGIN TRANSACTION');
-        await hooks?.begin();
         let finalized = false;
 
         const finalizedStatement =
@@ -183,17 +176,9 @@ export function setupOpen(QuickSQLite: ISQLite) {
             return action();
           };
 
-        const commit = finalizedStatement(async () => {
-          const result = await context.execute('COMMIT');
-          await hooks?.commit?.();
-          return result;
-        });
+        const commit = finalizedStatement(async () => context.execute('COMMIT'));
 
-        const rollback = finalizedStatement(async () => {
-          const result = await context.execute('ROLLBACK');
-          await hooks?.rollback?.();
-          return result;
-        });
+        const rollback = finalizedStatement(async () => context.execute('ROLLBACK'));
 
         const wrapExecute =
           <T>(
@@ -203,9 +188,7 @@ export function setupOpen(QuickSQLite: ISQLite) {
             if (finalized) {
               throw new Error(`Cannot execute in transaction after it has been finalized with commit/rollback.`);
             }
-            const result = await method(sql, params);
-            await hooks?.execute?.(sql, params);
-            return result;
+            return method(sql, params);
           };
 
         try {
@@ -237,46 +220,9 @@ export function setupOpen(QuickSQLite: ISQLite) {
         readLock,
         readTransaction: async <T>(callback: (context: TransactionContext) => Promise<T>, options?: LockOptions) =>
           readLock((context) => wrapTransaction(context, callback)),
-        writeLock: async <T>(callback: (context: TransactionContext) => Promise<T>, options?: LockOptions) =>
-          writeLock(callback, options, {
-            execute: async (sql) => {
-              if (!listenerManager.writeTransactionActive) {
-                // check if starting a transaction
-                if (sql == 'BEGIN' || sql == 'BEGIN IMMEDIATE') {
-                  listenerManager.transactionStarted();
-                  return;
-                }
-              }
-              // check if finishing a transaction
-              switch (sql) {
-                case 'ROLLBACK':
-                  listenerManager.transactionReverted();
-                  break;
-                case 'COMMIT':
-                case 'END TRANSACTION':
-                  listenerManager.transactionCommitted();
-                  break;
-              }
-            },
-            lockReleased: async () => {
-              if (listenerManager.writeTransactionActive) {
-                // The lock was completed without ending the transaction.
-                // This should not occur, but do not report these updates
-                listenerManager.transactionReverted();
-              }
-            }
-          }),
+        writeLock,
         writeTransaction: async <T>(callback: (context: TransactionContext) => Promise<T>, options?: LockOptions) =>
-          writeLock(
-            (context) =>
-              wrapTransaction(context, callback, TransactionFinalizer.COMMIT, {
-                begin: async () => listenerManager.transactionStarted(),
-                commit: async () => listenerManager.transactionCommitted(),
-                rollback: async () => listenerManager.transactionReverted()
-              }),
-            options
-          ),
-        registerUpdateHook: (callback: UpdateCallback) => listenerManager.registerListener({ tableUpdated: callback }),
+          writeLock((context) => wrapTransaction(context, callback, TransactionFinalizer.COMMIT), options),
         delete: () => QuickSQLite.delete(dbName, options?.location),
         executeBatch: (commands: SQLBatchTuple[]) =>
           writeLock((context) => QuickSQLite.executeBatch(dbName, commands, (context as any)._contextId)),
@@ -285,7 +231,10 @@ export function setupOpen(QuickSQLite: ISQLite) {
         detach: (alias: string) => QuickSQLite.detach(dbName, alias),
         loadFile: (location: string) =>
           writeLock((context) => QuickSQLite.loadFile(dbName, location, (context as any)._contextId)),
-        listenerManager
+        listenerManager,
+        registerUpdateHook: (callback: UpdateCallback) =>
+          listenerManager.registerListener({ rawTableChange: callback }),
+        registerTablesChangedHook: (callback) => listenerManager.registerListener({ tablesUpdated: callback })
       };
     }
   };

@@ -1,10 +1,12 @@
 import Chance from 'chance';
 import {
+  BatchedUpdateNotification,
   open,
   QueryResult,
   QuickSQLite,
   QuickSQLiteConnection,
   SQLBatchTuple,
+  TransactionEvent,
   UpdateNotification
 } from 'react-native-quick-sqlite';
 import { beforeEach, describe, it } from '../mocha/MochaRNAdapter';
@@ -472,15 +474,55 @@ export function registerBaseTests() {
       singleConnection.close();
     });
 
+    it('should trigger write transaction commit hooks', async () => {
+      const commitPromise = new Promise<void>((resolve) =>
+        db.listenerManager.registerListener({
+          writeTransaction: (event) => {
+            if (event.type == TransactionEvent.COMMIT) {
+              resolve();
+            }
+          }
+        })
+      );
+
+      const rollbackPromise = new Promise<void>((resolve) =>
+        db.listenerManager.registerListener({
+          writeTransaction: (event) => {
+            if (event.type == TransactionEvent.ROLLBACK) {
+              resolve();
+            }
+          }
+        })
+      );
+
+      await db.writeTransaction(async (tx) => tx.rollback());
+      await rollbackPromise;
+
+      // Need to actually do something for the commit hook to fire
+      await db.writeTransaction(async (tx) => {
+        await createTestUser(tx);
+      });
+      await commitPromise;
+    });
+
+    it('should batch table update changes', async () => {
+      const updatePromise = new Promise<BatchedUpdateNotification>((resolve) => db.registerTablesChangedHook(resolve));
+
+      await db.writeTransaction(async (tx) => {
+        await createTestUser(tx);
+        await createTestUser(tx);
+      });
+
+      const update = await updatePromise;
+
+      expect(update.rawUpdates.length).to.equal(2);
+    });
+
     it('Should reflect writeLock and writeTransaction updates on read connections', async () => {
       let readTriggerCallbacks = [];
 
       // Execute the read test whenever a table change ocurred
-      db.listenerManager.registerListener({
-        tableUpdated: () => {
-          readTriggerCallbacks.forEach((cb) => cb());
-        }
-      });
+      db.registerTablesChangedHook((update) => readTriggerCallbacks.forEach((cb) => cb()));
 
       const createReaders = () =>
         new Array(NUM_READ_CONNECTIONS).fill(null).map(() => {
