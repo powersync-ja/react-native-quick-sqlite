@@ -70,7 +70,6 @@ export class DBListenerManagerInternal extends DBListenerManager {
   }
 
   flushUpdates() {
-    console.log('updates', this.updateBuffer);
     if (!this.updateBuffer.length) {
       return;
     }

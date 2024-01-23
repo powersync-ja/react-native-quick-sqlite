@@ -172,12 +172,12 @@ export type QuickSQLiteConnection = {
    * Table changes are reported immediately.
    * Changes might not yet be committed if using a transaction.
    *  - Listen to transaction events in listenerManager if extra logic is required
-   * For most use cases use `` instead.
+   * For most use cases use `registerTablesChangedHook` instead.
    * @returns a function which will deregister the callback
    */
   registerUpdateHook(callback: UpdateCallback): () => void;
   /**
-   * Register a callback which will be fired whenever a change to a ROWID table
+   * Register a callback which will be fired whenever a update to a ROWID table
    * has been committed.
    * Changes inside write locks will be buffered until the lock is released or
    * if a transaction inside the lock has been committed.
