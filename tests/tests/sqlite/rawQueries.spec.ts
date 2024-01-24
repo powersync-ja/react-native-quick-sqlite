@@ -19,16 +19,36 @@ const chance = new Chance();
 // Attempting to open an already open DB results in an error.
 let db: QuickSQLiteConnection = global.db;
 
+const NUM_READ_CONNECTIONS = 3;
+
 function generateUserInfo() {
   return { id: chance.integer(), name: chance.name(), age: chance.integer(), networth: chance.floating() };
 }
 
 function createTestUser(context: { execute: (sql: string, args?: any[]) => Promise<QueryResult> } = db) {
   const { id, name, age, networth } = generateUserInfo();
-  return context.execute('INSERT INTO "User" (id, name, age, networth) VALUES(?, ?, ?, ?)', [id, name, age, networth]);
+  return context.execute('INSERT INTO User (id, name, age, networth) VALUES(?, ?, ?, ?)', [id, name, age, networth]);
 }
 
-const NUM_READ_CONNECTIONS = 3;
+/**
+ * Creates read locks then queries the User table.
+ * Returns an array of promises which resolve once each
+ * read connection contains rows.
+ */
+const createReaders = (callbacks: Array<() => void>) =>
+  new Array(NUM_READ_CONNECTIONS).fill(null).map(() => {
+    return db.readLock(async (tx) => {
+      return new Promise<number>((resolve) => {
+        // start a read lock for each connection
+        callbacks.push(async () => {
+          const result = await tx.execute('SELECT * from User');
+          const length = result.rows?.length;
+          console.log(`Reading Users returned ${length} rows`);
+          resolve(result.rows?.length);
+        });
+      });
+    });
+  });
 
 export function registerBaseTests() {
   beforeEach(async () => {
@@ -518,30 +538,14 @@ export function registerBaseTests() {
       expect(update.rawUpdates.length).to.equal(2);
     });
 
-    it('Should reflect writeLock and writeTransaction updates on read connections', async () => {
-      let readTriggerCallbacks = [];
+    it('Should reflect writeTransaction updates on read connections', async () => {
+      const readTriggerCallbacks = [];
 
       // Execute the read test whenever a table change ocurred
       db.registerTablesChangedHook((update) => readTriggerCallbacks.forEach((cb) => cb()));
 
-      const createReaders = () =>
-        new Array(NUM_READ_CONNECTIONS).fill(null).map(() => {
-          return db.readLock(async (tx) => {
-            return new Promise<number>((resolve) => {
-              // start a read lock for each connection
-              readTriggerCallbacks.push(async () => {
-                const result = await tx.execute('SELECT * from User');
-                if (result.rows?.length) {
-                  // The data reflected on the read connection
-                  resolve(result.rows?.length);
-                }
-              });
-            });
-          });
-        });
-
       // Test writeTransaction
-      let readerPromises = createReaders();
+      const readerPromises = createReaders(readTriggerCallbacks);
 
       await db.writeTransaction(async (tx) => {
         return createTestUser(tx);
@@ -549,15 +553,15 @@ export function registerBaseTests() {
 
       let resolved = await Promise.all(readerPromises);
       // The query result length for 1 item should be returned for all connections
-      expect(resolved, 'writeTransaction changes should reflect in read connections').to.deep.equal(
-        readerPromises.map(() => 1)
-      );
+      expect(resolved).to.deep.equal(readerPromises.map(() => 1));
+    });
 
-      await db.execute('DELETE FROM User');
-
+    it('Should reflect writeLock updates on read connections', async () => {
+      const readTriggerCallbacks = [];
       // Test writeLock
-      readerPromises = createReaders();
-      readTriggerCallbacks = [];
+      const readerPromises = createReaders(readTriggerCallbacks);
+      // Execute the read test whenever a table change ocurred
+      db.registerTablesChangedHook((update) => readTriggerCallbacks.forEach((cb) => cb()));
 
       await db.writeLock(async (tx) => {
         await tx.execute('BEGIN');
@@ -565,11 +569,9 @@ export function registerBaseTests() {
         await tx.execute('COMMIT');
       });
 
-      resolved = await Promise.all(readerPromises);
+      const resolved = await Promise.all(readerPromises);
       // The query result length for 1 item should be returned for all connections
-      expect(resolved, 'writeLock changes should reflect in read connections').to.deep.equal(
-        readerPromises.map(() => 1)
-      );
+      expect(resolved).to.deep.equal(readerPromises.map(() => 1));
     });
 
     it('Should attach DBs', async () => {
