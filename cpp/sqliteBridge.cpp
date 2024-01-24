@@ -40,6 +40,8 @@ sqliteOpenDb(string const dbName, string const docPath,
              void (*contextAvailableCallback)(std::string, ConnectionLockId),
              void (*updateTableCallback)(void *, int, const char *,
                                          const char *, sqlite3_int64),
+             void (*onTransactionFinalizedCallback)(
+                 const TransactionCallbackPayload *event),
              uint32_t numReadConnections) {
   if (dbMap.count(dbName) == 1) {
     return SQLiteOPResult{
@@ -51,6 +53,7 @@ sqliteOpenDb(string const dbName, string const docPath,
   dbMap[dbName] = new ConnectionPool(dbName, docPath, numReadConnections);
   dbMap[dbName]->setOnContextAvailable(contextAvailableCallback);
   dbMap[dbName]->setTableUpdateHandler(updateTableCallback);
+  dbMap[dbName]->setTransactionFinalizerHandler(onTransactionFinalizedCallback);
 
   return SQLiteOPResult{
       .type = SQLiteOk,

@@ -1,5 +1,14 @@
 import Chance from 'chance';
-import { open, QuickSQLite, QuickSQLiteConnection, SQLBatchTuple, UpdateNotification } from 'react-native-quick-sqlite';
+import {
+  BatchedUpdateNotification,
+  open,
+  QueryResult,
+  QuickSQLite,
+  QuickSQLiteConnection,
+  SQLBatchTuple,
+  TransactionEvent,
+  UpdateNotification
+} from 'react-native-quick-sqlite';
 import { beforeEach, describe, it } from '../mocha/MochaRNAdapter';
 import chai from 'chai';
 
@@ -10,9 +19,36 @@ const chance = new Chance();
 // Attempting to open an already open DB results in an error.
 let db: QuickSQLiteConnection = global.db;
 
+const NUM_READ_CONNECTIONS = 3;
+
 function generateUserInfo() {
   return { id: chance.integer(), name: chance.name(), age: chance.integer(), networth: chance.floating() };
 }
+
+function createTestUser(context: { execute: (sql: string, args?: any[]) => Promise<QueryResult> } = db) {
+  const { id, name, age, networth } = generateUserInfo();
+  return context.execute('INSERT INTO User (id, name, age, networth) VALUES(?, ?, ?, ?)', [id, name, age, networth]);
+}
+
+/**
+ * Creates read locks then queries the User table.
+ * Returns an array of promises which resolve once each
+ * read connection contains rows.
+ */
+const createReaders = (callbacks: Array<() => void>) =>
+  new Array(NUM_READ_CONNECTIONS).fill(null).map(() => {
+    return db.readLock(async (tx) => {
+      return new Promise<number>((resolve) => {
+        // start a read lock for each connection
+        callbacks.push(async () => {
+          const result = await tx.execute('SELECT * from User');
+          const length = result.rows?.length;
+          console.log(`Reading Users returned ${length} rows`);
+          resolve(result.rows?.length);
+        });
+      });
+    });
+  });
 
 export function registerBaseTests() {
   beforeEach(async () => {
@@ -22,7 +58,7 @@ export function registerBaseTests() {
         db.delete();
       }
 
-      global.db = db = open('test');
+      global.db = db = open('test', { numReadConnections: NUM_READ_CONNECTIONS });
 
       await db.execute('DROP TABLE IF EXISTS User; ');
       await db.execute('CREATE TABLE User ( id INT PRIMARY KEY, name TEXT NOT NULL, age INT, networth REAL) STRICT;');
@@ -33,13 +69,7 @@ export function registerBaseTests() {
 
   describe('Raw queries', () => {
     it('Insert', async () => {
-      const { id, name, age, networth } = generateUserInfo();
-      const res = await db.execute('INSERT INTO "User" (id, name, age, networth) VALUES(?, ?, ?, ?)', [
-        id,
-        name,
-        age,
-        networth
-      ]);
+      const res = await createTestUser();
       expect(res.rowsAffected).to.equal(1);
       expect(res.insertId).to.equal(1);
       expect(res.metadata).to.eql([]);
@@ -462,6 +492,86 @@ export function registerBaseTests() {
       expect((await p2).message).to.include('timed out');
 
       singleConnection.close();
+    });
+
+    it('should trigger write transaction commit hooks', async () => {
+      const commitPromise = new Promise<void>((resolve) =>
+        db.listenerManager.registerListener({
+          writeTransaction: (event) => {
+            if (event.type == TransactionEvent.COMMIT) {
+              resolve();
+            }
+          }
+        })
+      );
+
+      const rollbackPromise = new Promise<void>((resolve) =>
+        db.listenerManager.registerListener({
+          writeTransaction: (event) => {
+            if (event.type == TransactionEvent.ROLLBACK) {
+              resolve();
+            }
+          }
+        })
+      );
+
+      await db.writeTransaction(async (tx) => tx.rollback());
+      await rollbackPromise;
+
+      // Need to actually do something for the commit hook to fire
+      await db.writeTransaction(async (tx) => {
+        await createTestUser(tx);
+      });
+      await commitPromise;
+    });
+
+    it('should batch table update changes', async () => {
+      const updatePromise = new Promise<BatchedUpdateNotification>((resolve) => db.registerTablesChangedHook(resolve));
+
+      await db.writeTransaction(async (tx) => {
+        await createTestUser(tx);
+        await createTestUser(tx);
+      });
+
+      const update = await updatePromise;
+
+      expect(update.rawUpdates.length).to.equal(2);
+    });
+
+    it('Should reflect writeTransaction updates on read connections', async () => {
+      const readTriggerCallbacks = [];
+
+      // Execute the read test whenever a table change ocurred
+      db.registerTablesChangedHook((update) => readTriggerCallbacks.forEach((cb) => cb()));
+
+      // Test writeTransaction
+      const readerPromises = createReaders(readTriggerCallbacks);
+
+      await db.writeTransaction(async (tx) => {
+        return createTestUser(tx);
+      });
+
+      let resolved = await Promise.all(readerPromises);
+      // The query result length for 1 item should be returned for all connections
+      expect(resolved).to.deep.equal(readerPromises.map(() => 1));
+    });
+
+    it('Should reflect writeLock updates on read connections', async () => {
+      const readTriggerCallbacks = [];
+      // Test writeLock
+      const readerPromises = createReaders(readTriggerCallbacks);
+      // Execute the read test whenever a table change ocurred
+      db.registerTablesChangedHook((update) => readTriggerCallbacks.forEach((cb) => cb()));
+
+      await db.writeLock(async (tx) => {
+        await tx.execute('BEGIN');
+        await createTestUser(tx);
+        await tx.execute('COMMIT');
+      });
+
+      const resolved = await Promise.all(readerPromises);
+      // The query result length for 1 item should be returned for all connections
+      expect(resolved).to.deep.equal(readerPromises.map(() => 1));
     });
 
     it('Should attach DBs', async () => {
