@@ -6,7 +6,7 @@ on:
 jobs:
   test:
     name: Test
-    runs-on: ubuntu-xl
+    runs-on: ubuntu-latest
     env:
       # TODO list
       AVD_NAME: macOS-avd-x86_64-31
