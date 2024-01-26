@@ -6,13 +6,19 @@ on:
 jobs:
   test:
     name: Test
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     env:
-      AVD_NAME: macOS-avd-x86_64-31
+      AVD_NAME: ubuntu-avd-x86_64-31
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
 
       - name: Gradle Cache
         uses: gradle/gradle-build-action@v2
@@ -73,3 +79,6 @@ jobs:
           arch: x86_64
           avd-name: $AVD_NAME
           script: cd tests && yarn test --avdName $AVD_NAME
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
