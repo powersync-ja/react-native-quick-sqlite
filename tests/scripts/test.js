@@ -105,11 +105,14 @@ async function getADBDeviceName(avdName) {
     .filter((line) => !!line)
     .value();
 
+  console.log('ADB DEVICES:', JSON.stringify(deviceNames));
+
   // Need to check all devices for their AVD name
   for (let deviceName of deviceNames) {
     try {
       const deviceAVDNameResponse = await spawnP(tag, `adb`, [`-s`, deviceName, `emu`, `avd`, `name`]);
       const deviceAVDName = deviceAVDNameResponse.split('\n')[0].trim();
+      console.log(`Device name for ${deviceName} is ${deviceAVDName}`);
       if (deviceAVDName == avdName) {
         return deviceName; // This device has the specified AVD name
       }
