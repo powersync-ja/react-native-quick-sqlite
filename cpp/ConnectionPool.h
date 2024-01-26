@@ -7,6 +7,13 @@
 #ifndef ConnectionPool_h
 #define ConnectionPool_h
 
+enum TransactionEvent { COMMIT, ROLLBACK };
+
+struct TransactionCallbackPayload {
+  std::string *dbName;
+  TransactionEvent event;
+};
+
 // The number of concurrent read connections to the database.
 /**
  * Concurrent connection pool class.
@@ -57,7 +64,12 @@ private:
   std::vector<ConnectionLockId> readQueue;
   std::vector<ConnectionLockId> writeQueue;
 
+  // Cached constant payloads for c style commit/rollback callbacks
+  const TransactionCallbackPayload commitPayload;
+  const TransactionCallbackPayload rollbackPayload;
+
   void (*onContextCallback)(std::string, ConnectionLockId);
+  void (*onCommitCallback)(const TransactionCallbackPayload *);
 
   bool isConcurrencyEnabled;
 
@@ -65,6 +77,8 @@ public:
   ConnectionPool(std::string dbName, std::string docPath,
                  unsigned int numReadConnections);
   ~ConnectionPool();
+
+  friend int onCommitIntermediate(ConnectionPool *pool);
 
   /**
    * Add a task to the read queue. If there are no available connections,
@@ -95,6 +109,12 @@ public:
                                               const char *, sqlite3_int64));
 
   /**
+   * Set a callback function for transaction commits/rollbacks
+   */
+  void setTransactionFinalizerHandler(
+      void (*callback)(const TransactionCallbackPayload *));
+
+  /**
    * Close a context in order to progress queue
    */
   void closeContext(ConnectionLockId contextId);
@@ -123,5 +143,7 @@ private:
   SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,
                                      sqlite3 **db, int sqlOpenFlags);
 };
+
+int onCommitIntermediate(ConnectionPool *pool);
 
 #endif

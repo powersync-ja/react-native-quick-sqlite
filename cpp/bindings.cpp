@@ -68,6 +68,32 @@ void updateTableHandler(void *voidDBName, int opType, char const *dbName,
 }
 
 /**
+ * Callback handler for SQLite transaction updates
+ */
+void transactionFinalizerHandler(const TransactionCallbackPayload *payload) {
+  /**
+   * No DB operations should occur when this callback is fired from SQLite.
+   * This function triggers an async invocation to call watch callbacks,
+   * avoiding holding SQLite up.
+   */
+  invoker->invokeAsync([payload] {
+    try {
+      auto global = runtime->global();
+      jsi::Function handlerFunction = global.getPropertyAsFunction(
+          *runtime, "triggerTransactionFinalizerHook");
+
+      auto jsiDbName = jsi::String::createFromAscii(*runtime, *payload->dbName);
+      auto jsiEventType = jsi::Value((int)payload->event);
+      handlerFunction.call(*runtime, move(jsiDbName), move(jsiEventType));
+    } catch (jsi::JSINativeException e) {
+      std::cout << e.what() << std::endl;
+    } catch (...) {
+      std::cout << "Unknown error" << std::endl;
+    }
+  });
+}
+
+/**
  * Callback handler for Concurrent context is available
  */
 void contextLockAvailableHandler(std::string dbName,
@@ -137,9 +163,9 @@ void osp::install(jsi::Runtime &rt,
       }
     }
 
-    auto result =
-        sqliteOpenDb(dbName, tempDocPath, &contextLockAvailableHandler,
-                     &updateTableHandler, numReadConnections);
+    auto result = sqliteOpenDb(
+        dbName, tempDocPath, &contextLockAvailableHandler, &updateTableHandler,
+        &transactionFinalizerHandler, numReadConnections);
     if (result.type == SQLiteError) {
       throw jsi::JSError(rt, result.errorMessage.c_str());
     }

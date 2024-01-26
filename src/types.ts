@@ -1,3 +1,5 @@
+import { DBListenerManager } from './DBListenerManager';
+
 /**
  * Object returned by SQL Query executions {
  *  insertId: Represent the auto-generated row id if applicable
@@ -72,13 +74,30 @@ export enum RowUpdateType {
   SQLITE_DELETE = 9,
   SQLITE_UPDATE = 23
 }
-export interface UpdateNotification {
+
+export interface TableUpdateOperation {
   opType: RowUpdateType;
-  table: string;
   rowId: number;
+}
+export interface UpdateNotification extends TableUpdateOperation {
+  table: string;
+}
+
+export interface BatchedUpdateNotification {
+  rawUpdates: UpdateNotification[];
+  tables: string[];
+  groupedUpdates: Record<string, TableUpdateOperation[]>;
 }
 
 export type UpdateCallback = (update: UpdateNotification) => void;
+export type BatchedUpdateCallback = (update: BatchedUpdateNotification) => void;
+
+export enum TransactionEvent {
+  COMMIT,
+  ROLLBACK
+}
+
+export type TransactionCallback = (eventType: TransactionEvent) => void;
 
 export type ContextLockID = string;
 
@@ -149,8 +168,22 @@ export type QuickSQLiteConnection = {
   executeBatch: (commands: SQLBatchTuple[]) => Promise<BatchQueryResult>;
   loadFile: (location: string) => Promise<FileLoadResult>;
   /**
-   * Note that only one listener can be registered per database connection.
-   * Any new hook registration will override the previous one.
+   * Register a callback which will be fired for each ROWID table change event.
+   * Table changes are reported immediately.
+   * Changes might not yet be committed if using a transaction.
+   *  - Listen to transaction events in listenerManager if extra logic is required
+   * For most use cases use `registerTablesChangedHook` instead.
+   * @returns a function which will deregister the callback
    */
-  registerUpdateHook(callback: UpdateCallback): void;
+  registerUpdateHook(callback: UpdateCallback): () => void;
+  /**
+   * Register a callback which will be fired whenever a update to a ROWID table
+   * has been committed.
+   * Changes inside write locks will be buffered until the lock is released or
+   * if a transaction inside the lock has been committed.
+   * Reverting a transaction inside a write lock will not fire table updates.
+   * @returns a function which will deregister the callback
+   */
+  registerTablesChangedHook(callback: BatchedUpdateCallback): () => void;
+  listenerManager: DBListenerManager;
 };

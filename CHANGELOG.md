@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 1.1.0
+
+### Minor Changes
+
+- 3bb0212: Added `registerTablesChangedHook` to DB connections which reports batched table updates once `writeTransaction`s and `writeLock`s have been committed. Maintained API compatibility with `registerUpdateHook` which reports table change events as they occur. Added listeners for when write transactions have been committed or rolled back.
+
 ## 1.0.0
 
 ### Major Changes
