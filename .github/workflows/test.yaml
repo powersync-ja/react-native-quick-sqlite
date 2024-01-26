@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # TODO list
-      AVD_NAME: macOS-avd-x86_64-31
+      AVD_NAME: ubuntu-avd-x86_64-31
     steps:
       - uses: actions/checkout@v4
         with:
@@ -80,3 +80,6 @@ jobs:
           arch: x86_64
           avd-name: $AVD_NAME
           script: cd tests && yarn test --avdName $AVD_NAME
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
