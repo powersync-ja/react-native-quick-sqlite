@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 1.1.1
+
+### Patch Changes
+
+- b1324f1: Updated PowerSync SQLite Core to ~>0.1.6. https://github.com/powersync-ja/powersync-sqlite-core/pull/3
+
 ## 1.1.0
 
 ### Minor Changes
