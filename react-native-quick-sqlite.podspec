@@ -29,7 +29,7 @@ Pod::Spec.new do |s|
   s.dependency "React-callinvoker"
   s.dependency "React"
   s.dependency "React-Core"
-  s.dependency 'powersync-sqlite-core'
+  s.dependency "powersync-sqlite-core", "~> 0.1.6"
 
   if ENV['QUICK_SQLITE_USE_PHONE_VERSION'] == '1' then
     s.exclude_files = "cpp/sqlite3.c", "cpp/sqlite3.h"
