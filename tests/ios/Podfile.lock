@@ -37,7 +37,7 @@ PODS:
     - hermes-engine/Pre-built (= 0.72.6)
   - hermes-engine/Pre-built (0.72.6)
   - libevent (2.1.12)
-  - powersync-sqlite-core (0.1.3)
+  - powersync-sqlite-core (0.1.6)
   - RCT-Folly (2021.07.22.00):
     - boost
     - DoubleConversion
@@ -340,8 +340,8 @@ PODS:
     - glog
   - react-native-get-random-values (1.9.0):
     - React-Core
-  - react-native-quick-sqlite (1.0.0):
-    - powersync-sqlite-core
+  - react-native-quick-sqlite (1.1.1):
+    - powersync-sqlite-core (~> 0.1.6)
     - React
     - React-callinvoker
     - React-Core
@@ -641,7 +641,7 @@ SPEC CHECKSUMS:
   glog: 04b94705f318337d7ead9e6d17c019bd9b1f6b1b
   hermes-engine: 8057e75cfc1437b178ac86c8654b24e7fead7f60
   libevent: 4049cae6c81cdb3654a443be001fb9bdceff7913
-  powersync-sqlite-core: a8c9c0f5ddb25099973bece98776080400346fe3
+  powersync-sqlite-core: 4c38c8f470f6dca61346789fd5436a6826d1e3dd
   RCT-Folly: 424b8c9a7a0b9ab2886ffe9c3b041ef628fd4fb1
   RCTRequired: 28469809442eb4eb5528462705f7d852948c8a74
   RCTTypeSafety: e9c6c409fca2cc584e5b086862d562540cb38d29
@@ -658,7 +658,7 @@ SPEC CHECKSUMS:
   React-jsinspector: 194e32c6aab382d88713ad3dd0025c5f5c4ee072
   React-logger: cebf22b6cf43434e471dc561e5911b40ac01d289
   react-native-get-random-values: dee677497c6a740b71e5612e8dbd83e7539ed5bb
-  react-native-quick-sqlite: d55edadf2d63f9ca9e3bc4bb138bf61739294413
+  react-native-quick-sqlite: b99b264d738643c12545519cffa449513a3a7c28
   react-native-safe-area-context: 238cd8b619e05cb904ccad97ef42e84d1b5ae6ec
   React-NativeModulesApple: 02e35e9a51e10c6422f04f5e4076a7c02243fff2
   React-perflogger: e3596db7e753f51766bceadc061936ef1472edc3
