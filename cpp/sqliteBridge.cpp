@@ -11,10 +11,10 @@
 #include "ConnectionPool.h"
 #include "fileUtils.h"
 #include "logs.h"
+#include "sqlite3.h"
 #include <ctime>
 #include <iostream>
 #include <map>
-#include <sqlite3.h>
 #include <sstream>
 #include <sys/stat.h>
 #include <unistd.h>

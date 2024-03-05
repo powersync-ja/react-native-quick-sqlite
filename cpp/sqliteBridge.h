@@ -9,7 +9,7 @@
 
 #include "ConnectionPool.h"
 #include "JSIHelper.h"
-#include <sqlite3.h>
+#include "sqlite3.h"
 #include <vector>
 
 #ifndef SQLiteBridge_h
