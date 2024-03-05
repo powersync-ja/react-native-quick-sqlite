@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 1.1.2
+
+### Patch Changes
+
+- 4979882: Fixed incorrect imports of `sqlite3.h` to use local version.
+
 ## 1.1.1
 
 ### Patch Changes
