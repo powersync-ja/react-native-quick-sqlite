@@ -68,6 +68,8 @@ jobs:
           arch: x86_64
           disable-animations: false
           avd-name: $AVD_NAME
+          disk-size: 2048M
+          sdcard-path-or-size: 1000M
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: echo "Generated AVD snapshot for caching."
 
@@ -78,6 +80,8 @@ jobs:
           target: google_apis
           arch: x86_64
           avd-name: $AVD_NAME
+          disk-size: 2048M
+          sdcard-path-or-size: 1000M
           script: cd tests && yarn test --avdName $AVD_NAME
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
