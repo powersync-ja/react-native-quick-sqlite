@@ -6,7 +6,7 @@ on:
 jobs:
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-xl
     env:
       AVD_NAME: ubuntu-avd-x86_64-31
     steps:
