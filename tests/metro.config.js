@@ -1,37 +1,29 @@
-const path = require('path');
-const exclusionList = require('metro-config/src/defaults/exclusionList');
-const escape = require('escape-string-regexp');
-const pak = require('../package.json');
+// // Learn more https://docs.expo.dev/guides/monorepos
+const { getDefaultConfig } = require('expo/metro-config');
+const path = require('node:path');
 
-const root = path.resolve(__dirname, '..');
+// // Find the project and workspace directories
+const projectRoot = __dirname;
+const workspaceRoot = path.resolve(projectRoot, '..');
 
-const modules = Object.keys({
-  ...pak.peerDependencies,
+const config = getDefaultConfig(projectRoot);
+
+// 1. Watch all files within the monorepo
+config.watchFolders = [workspaceRoot];
+// 2. Let Metro know where to resolve packages and in what order
+config.resolver.nodeModulesPaths = [
+  path.resolve(projectRoot, 'node_modules'),
+  path.resolve(workspaceRoot, 'node_modules')
+];
+// // #3 - Force resolving nested modules to the folders below
+config.resolver.disableHierarchicalLookup = true;
+config.resolver.unstable_enableSymlinks = true;
+
+config.transformer.getTransformOptions = async () => ({
+  transform: {
+    experimentalImportSupport: false,
+    inlineRequires: true,
+  },
 });
-module.exports = {
-  projectRoot: __dirname,
-  watchFolders: [root],
 
-  // We need to make sure that only one version is loaded for peerDependencies
-  // So we blacklist them at the root, and alias them to the versions in example's node_modules
-  resolver: {
-    blockList: exclusionList(
-      modules.map(
-        m => new RegExp(`^${escape(path.join(root, 'node_modules', m))}\\/.*$`),
-      ),
-    ),
-
-    extraNodeModules: modules.reduce((acc, name) => {
-      acc[name] = path.join(__dirname, 'node_modules', name);
-      return acc;
-    }, {}),
-  },
-  transformer: {
-    getTransformOptions: async () => ({
-      transform: {
-        experimentalImportSupport: false,
-        inlineRequires: true,
-      },
-    }),
-  },
-};
+module.exports = config;

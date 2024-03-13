@@ -11,13 +11,14 @@ const chalk = require('chalk');
 const { program } = require('commander');
 
 const DEFAULT_AVD_NAME = 'macOS-avd-x86_64-29';
+const DEFAULT_SIMULATOR_NAME = 'iPhone 11';
 const DEFAULT_PORT = 4243;
 const TEST_TIMEOUT = 1_800_000; // 30 minutes
 
 program.name('Test Suite').description('Automates tests for React Native app based tests');
 
 program
-  .command('run')
+  .command('run-android')
   .option(
     '--avdName <name>',
     'The virtual android device name (the adb device name will be fetched from this)',
@@ -42,30 +43,45 @@ program
     const app = express();
     app.use(bodyParser.json());
 
-    const resultsPromise = new Promise((resolve, reject) => {
-      /**
-       * We can receive results from here
-       */
-      const timeout = setTimeout(() => {
-        reject(new Error('Test timed out'));
-      }, TEST_TIMEOUT);
-
-      app.post('/results', (req, res) => {
-        clearTimeout(timeout);
-        const results = req.body;
-        displayResults(results);
-        if (results.some((r) => r.type == 'incorrect')) {
-          reject(new Error('Not all tests have passed'));
-        } else {
-          resolve(results);
-        }
-
-        return res.send('Done');
-      });
-    });
+    const resultsPromise = receiveResults(app);
 
     /** Listen for results */
     const server = app.listen(port);
+    await resultsPromise;
+    server.close();
+
+    console.log('Done with tests');
+    process.exit(0);
+  });
+
+program
+  .command('run-ios')
+  .option(
+    '--simulatorName <name>',
+    'The iOS simulator name (e.g., "iPhone 11")',
+    DEFAULT_SIMULATOR_NAME
+  )
+  .option('--port', 'Port to run Express HTTP server for getting results on.', DEFAULT_PORT)
+  .action(async (str, options) => {
+    const opts = options.opts();
+    const simulatorName = opts.simulatorName;
+    const deviceName = await getSimulatorDeviceName(simulatorName);
+    if (!deviceName) {
+      throw new Error(`Could not find iOS simulator with name ${simulatorName}`);
+    }
+
+    const port = opts.port;
+    const app = express();
+    app.use(bodyParser.json());
+
+    const resultsPromise = receiveResults(app);
+
+    /** Listen for results */
+    const server = app.listen(port);
+    
+    /** Build and run the Expo app, don't await this, we will await a response. */
+    spawnP('Build Expo App', 'yarn', ['ios']);
+
     await resultsPromise;
     server.close();
 
@@ -117,6 +133,50 @@ async function getADBDeviceName(avdName) {
       console.warn(ex);
     }
   }
+}
+
+async function getSimulatorDeviceName(simulatorName) {
+  try {    
+    const devicesOutput = await spawnP('List iOS Simulators', 'xcrun', ['simctl', 'list', 'devices', 'x']);
+    const deviceNames = _.chain(devicesOutput.split('\n'))
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith(simulatorName))
+      .value();
+
+    if (deviceNames.length > 0) {
+      return deviceNames[0];
+    } else {
+      console.error(`No iOS simulator found with name ${simulatorName}`);
+      return null;
+    }
+  } catch (ex) {
+    console.error(ex);
+    return null;
+  }
+}
+
+async function receiveResults(app) {
+  return new Promise((resolve, reject) => {
+    /**
+     * We can receive results from here
+     */
+    const timeout = setTimeout(() => {
+      reject(new Error('Test timed out'));
+    }, TEST_TIMEOUT);
+
+    app.post('/results', (req, res) => {
+      clearTimeout(timeout);
+      const results = req.body;
+      displayResults(results);
+      if (results.some((r) => r.type == 'incorrect')) {
+        reject(new Error('Not all tests have passed'));
+      } else {
+        resolve(results);
+      }
+
+      return res.send('Done');
+    });
+  });
 }
 
 function displayResults(results) {

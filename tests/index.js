@@ -1,6 +1,6 @@
 import { registerRootComponent } from 'expo';
-import { Buffer } from '@craftzdog/react-native-buffer';
 import App from './App';
+import { Buffer } from '@craftzdog/react-native-buffer';
 
 global.Buffer = Buffer;
 global.process.cwd = () => 'sxsx';
