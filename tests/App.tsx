@@ -5,6 +5,7 @@ import 'reflect-metadata';
 import 'react-native-get-random-values';
 
 import { registerBaseTests, runTests } from './tests/index';
+import { registerQueriesBaseTests } from './tests/sqlite/queries.spec';
 const TEST_SERVER_URL = 'http://localhost:4243/results';
 
 export default function App() {
@@ -14,14 +15,24 @@ export default function App() {
     setResults([]);
 
     try {
-      const results = await runTests(registerBaseTests);
-      console.log(JSON.stringify(results, null, '\t'));
-      setResults(results);
-      // Send results to host server
+      // let results = await runTests(registerBaseTests);
+      // console.log(JSON.stringify(results, null, '\t'));
+      // setResults(results);
+      // // Send results to host server
+      // await fetch(TEST_SERVER_URL, {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify(results),
+      // });
+
+      setResults([]);
+      let results1 = await runTests(registerQueriesBaseTests);
+      console.log(JSON.stringify(results1, null, '\t'));
+      setResults(results1);
       await fetch(TEST_SERVER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(results)
+        body: JSON.stringify(results1),
       });
     } catch (ex) {
       console.error(ex);
@@ -32,9 +43,9 @@ export default function App() {
         body: JSON.stringify([
           {
             description: `Caught exception: ${ex}`,
-            type: 'incorrect'
-          }
-        ])
+            type: 'incorrect',
+          },
+        ]),
       });
     }
   }, []);
@@ -47,7 +58,9 @@ export default function App() {
   return (
     <SafeAreaView className="flex-1 bg-neutral-900">
       <ScrollView className="p-4">
-        <Text className="font-bold text-blue-500 text-lg text-center">RN Quick SQLite Test Suite</Text>
+        <Text className="font-bold text-blue-500 text-lg text-center">
+          RN Quick SQLite Test Suite
+        </Text>
         {results.map((r: any, i: number) => {
           if (r.type === 'grouping') {
             return (

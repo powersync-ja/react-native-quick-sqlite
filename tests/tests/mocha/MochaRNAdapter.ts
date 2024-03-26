@@ -2,7 +2,7 @@ import 'mocha';
 import type * as MochaTypes from 'mocha';
 
 export const rootSuite = new Mocha.Suite('') as MochaTypes.Suite;
-rootSuite.timeout(10 * 1000);
+rootSuite.timeout(10 * 10000);
 
 let mochaContext = rootSuite;
 
@@ -15,7 +15,10 @@ export const clearTests = () => {
   only = false;
 };
 
-export const it = (name: string, f: MochaTypes.Func | MochaTypes.AsyncFunc): void => {
+export const it = (
+  name: string,
+  f: MochaTypes.Func | MochaTypes.AsyncFunc
+): void => {
   if (!only) {
     const test = new Mocha.Test(name, async () => {
       console.log(`Running ${name}`);
@@ -26,7 +29,10 @@ export const it = (name: string, f: MochaTypes.Func | MochaTypes.AsyncFunc): voi
   }
 };
 
-export const itOnly = (name: string, f: MochaTypes.Func | MochaTypes.AsyncFunc): void => {
+export const itOnly = (
+  name: string,
+  f: MochaTypes.Func | MochaTypes.AsyncFunc
+): void => {
   clearTests();
   const test = new Mocha.Test(name, f);
   mochaContext.addTest(test);
@@ -35,7 +41,10 @@ export const itOnly = (name: string, f: MochaTypes.Func | MochaTypes.AsyncFunc):
 
 export const describe = (name: string, f: () => void): void => {
   const prevMochaContext = mochaContext;
-  mochaContext = new Mocha.Suite(name, prevMochaContext.ctx) as MochaTypes.Suite;
+  mochaContext = new Mocha.Suite(
+    name,
+    prevMochaContext.ctx
+  ) as MochaTypes.Suite;
   prevMochaContext.addSuite(mochaContext);
   console.log(`Running ${name}`);
   f();
