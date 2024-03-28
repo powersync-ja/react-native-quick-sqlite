@@ -30,6 +30,9 @@ enum TransactionFinalizer {
 
 const DEFAULT_READ_CONNECTIONS = 4;
 
+const getNow = () => new Date().valueOf() % 1000000;
+const logEvent = (name: string) => console.log(`LOG: ${name} --- ${getNow()}`);
+
 const LockCallbacks: Record<ContextLockID, LockCallbackRecord> = {};
 let proxy: ISQLite;
 
@@ -39,8 +42,10 @@ let proxy: ISQLite;
 function closeContextLock(dbName: string, id: ContextLockID) {
   delete LockCallbacks[id];
 
+  logEvent('before calling proxy.releaseLock');
   // This is configured by the setupOpen function
   proxy.releaseLock(dbName, id);
+  logEvent('after calling proxy.releaseLock');
 }
 
 /**
@@ -121,8 +126,11 @@ export function setupOpen(QuickSQLite: ISQLite) {
         options?: LockOptions,
         hooks?: LockHooks
       ): Promise<T> => {
+        logEvent('requestLock start');
         let start = performance.now();
         const id = uuid.v4(); // TODO maybe do this in C++
+        logEvent('requestLock uuid generated');
+
         let end = performance.now();
         console.log(`Gen uuid.v4() ${end - start}`);
         // Wrap the callback in a promise that will resolve to the callback result
@@ -132,11 +140,16 @@ export function setupOpen(QuickSQLite: ISQLite) {
             callback: async (context: LockContext) => {
               try {
                 start = performance.now();
+                logEvent('[lockCallback] Before executing lock aquired');
                 await hooks?.lockAcquired?.();
+                logEvent('[lockCallback] After executing lock aquired');
+
                 end = performance.now();
                 console.log(`hooks?.lockAcquired ${end - start}`);
                 start = performance.now();
+                logEvent('[lockCallback] Before calling callback');
                 const res = await callback(context);
+                logEvent('[lockCallback] After calling callback');
                 end = performance.now();
                 console.log(`requestLock -> await callback() ${end - start}`);
                 // Ensure that we only resolve after locks are freed
@@ -154,7 +167,9 @@ export function setupOpen(QuickSQLite: ISQLite) {
 
           try {
             start = performance.now();
+            logEvent('Before calling QuickSQLite.requestLock');
             QuickSQLite.requestLock(dbName, id, type);
+            logEvent('After calling QuickSQLite.requestLock');
             end = performance.now();
             console.log(`QuickSQLite.requestLock() ${end - start}`);
             const timeout = options?.timeoutMs;
@@ -186,8 +201,11 @@ export function setupOpen(QuickSQLite: ISQLite) {
         let start = performance.now();
         return requestLock(ConcurrentLockType.WRITE, callback, options, {
           lockReleased: async () => {
+            logEvent('In lockReleased callback');
             // flush updates once a write lock has been released
+            logEvent('In lockReleased callback: before flushing updates');
             listenerManager.flushUpdates();
+            logEvent('In lockReleased callback: after flushing updates');
             let end = performance.now();
             console.log(`Flushing write lock ${end - start}`);
           },

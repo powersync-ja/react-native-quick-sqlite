@@ -546,8 +546,6 @@ namespace osp
           createSequelQueryExecutionResult(rt, lockResult, &resultsHolder, NULL);
       auto stop = high_resolution_clock::now();
       auto duration = duration_cast<nanoseconds>(stop - start);
-      string s = "[react-native-quick-sqlite][requestLock][time]" + std::to_string(duration.count());
-      throw jsi::JSError(rt, s);
       return jsiResult;
     });
 
