@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 1.1.3
+
+### Patch Changes
+
+- b12ec4d: This pull request improves the performance of releasing lock operations. Executing multiple lock operations, such as individual calls to `.execute`, should see a significant performance improvement.
+
 ## 1.1.2
 
 ### Patch Changes
