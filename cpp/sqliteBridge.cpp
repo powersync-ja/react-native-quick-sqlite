@@ -25,7 +25,8 @@ using namespace facebook;
 std::map<std::string, ConnectionPool *> dbMap =
     std::map<std::string, ConnectionPool *>();
 
-SQLiteOPResult generateNotOpenResult(std::string const &dbName) {
+SQLiteOPResult generateNotOpenResult(std::string const &dbName)
+{
   return SQLiteOPResult{
       .type = SQLiteError,
       .errorMessage = dbName + " is not open",
@@ -42,8 +43,10 @@ sqliteOpenDb(string const dbName, string const docPath,
                                          const char *, sqlite3_int64),
              void (*onTransactionFinalizedCallback)(
                  const TransactionCallbackPayload *event),
-             uint32_t numReadConnections) {
-  if (dbMap.count(dbName) == 1) {
+             uint32_t numReadConnections)
+{
+  if (dbMap.count(dbName) == 1)
+  {
     return SQLiteOPResult{
         .type = SQLiteError,
         .errorMessage = dbName + " is already open",
@@ -60,8 +63,10 @@ sqliteOpenDb(string const dbName, string const docPath,
   };
 }
 
-SQLiteOPResult sqliteCloseDb(string const dbName) {
-  if (dbMap.count(dbName) == 0) {
+SQLiteOPResult sqliteCloseDb(string const dbName)
+{
+  if (dbMap.count(dbName) == 0)
+  {
     return generateNotOpenResult(dbName);
   }
 
@@ -76,8 +81,10 @@ SQLiteOPResult sqliteCloseDb(string const dbName) {
   };
 }
 
-void sqliteCloseAll() {
-  for (auto const &x : dbMap) {
+void sqliteCloseAll()
+{
+  for (auto const &x : dbMap)
+  {
     x.second->closeAll();
     delete x.second;
   }
@@ -86,8 +93,10 @@ void sqliteCloseAll() {
 
 SQLiteOPResult sqliteQueueInContext(std::string dbName,
                                     ConnectionLockId const contextId,
-                                    std::function<void(sqlite3 *)> task) {
-  if (dbMap.count(dbName) == 0) {
+                                    std::function<void(sqlite3 *)> task)
+{
+  if (dbMap.count(dbName) == 0)
+  {
     return generateNotOpenResult(dbName);
   }
 
@@ -96,33 +105,41 @@ SQLiteOPResult sqliteQueueInContext(std::string dbName,
 }
 
 void sqliteReleaseLock(std::string const dbName,
-                       ConnectionLockId const contextId) {
-  if (dbMap.count(dbName) == 0) {
+                       ConnectionLockId const contextId)
+{
+  LOGSIMPLE("[sqliteReleaseLock] start %lld", timestamp);
+  if (dbMap.count(dbName) == 0)
+  {
     // Do nothing if the lock does not actually exist
     return;
   }
 
   ConnectionPool *connection = dbMap[dbName];
   connection->closeContext(contextId);
+  LOGSIMPLE("[sqliteReleaseLock] end %lld", timestamp);
 }
 
 SQLiteOPResult sqliteRequestLock(std::string const dbName,
                                  ConnectionLockId const contextId,
-                                 ConcurrentLockType lockType) {
-  if (dbMap.count(dbName) == 0) {
+                                 ConcurrentLockType lockType)
+{
+  if (dbMap.count(dbName) == 0)
+  {
     return generateNotOpenResult(dbName);
   }
 
   ConnectionPool *connection = dbMap[dbName];
 
-  if (connection == nullptr) {
+  if (connection == nullptr)
+  {
     return SQLiteOPResult{
         .type = SQLiteOk,
 
     };
   }
 
-  switch (lockType) {
+  switch (lockType)
+  {
   case ConcurrentLockType::ReadLock:
     connection->readLock(contextId);
     break;
@@ -141,8 +158,10 @@ SQLiteOPResult sqliteRequestLock(std::string const dbName,
 
 SQLiteOPResult sqliteAttachDb(string const mainDBName, string const docPath,
                               string const databaseToAttach,
-                              string const alias) {
-  if (dbMap.count(mainDBName) == 0) {
+                              string const alias)
+{
+  if (dbMap.count(mainDBName) == 0)
+  {
     return generateNotOpenResult(mainDBName);
   }
 
@@ -150,8 +169,10 @@ SQLiteOPResult sqliteAttachDb(string const mainDBName, string const docPath,
   return connection->attachDatabase(databaseToAttach, docPath, alias);
 }
 
-SQLiteOPResult sqliteDetachDb(string const mainDBName, string const alias) {
-  if (dbMap.count(mainDBName) == 0) {
+SQLiteOPResult sqliteDetachDb(string const mainDBName, string const alias)
+{
+  if (dbMap.count(mainDBName) == 0)
+  {
     return generateNotOpenResult(mainDBName);
   }
 
@@ -159,17 +180,21 @@ SQLiteOPResult sqliteDetachDb(string const mainDBName, string const alias) {
   return connection->detachDatabase(alias);
 }
 
-SQLiteOPResult sqliteRemoveDb(string const dbName, string const docPath) {
-  if (dbMap.count(dbName) == 1) {
+SQLiteOPResult sqliteRemoveDb(string const dbName, string const docPath)
+{
+  if (dbMap.count(dbName) == 1)
+  {
     SQLiteOPResult closeResult = sqliteCloseDb(dbName);
-    if (closeResult.type == SQLiteError) {
+    if (closeResult.type == SQLiteError)
+    {
       return closeResult;
     }
   }
 
   string dbPath = get_db_path(dbName, docPath);
 
-  if (!file_exists(dbPath)) {
+  if (!file_exists(dbPath))
+  {
     return SQLiteOPResult{
         .type = SQLiteOk,
         .errorMessage =

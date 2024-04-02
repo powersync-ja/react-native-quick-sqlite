@@ -153,13 +153,20 @@ export function setupOpen(QuickSQLite: ISQLite) {
                 end = performance.now();
                 console.log(`requestLock -> await callback() ${end - start}`);
                 // Ensure that we only resolve after locks are freed
-                _.defer(() => resolve(res));
+                // _.defer(() => resolve(res));
+                closeContextLock(dbName, id);
+                resolve(res);
+                logEvent('[lockCallback] -> resolve');
                 console.log(`requestLock -> resolve ${end - start}`);
               } catch (ex) {
-                _.defer(() => reject(ex));
+                closeContextLock(dbName, id);
+                reject(ex);
+                // _.defer(() => reject(ex));
               } finally {
-                _.defer(() => hooks?.lockReleased?.());
+                hooks?.lockReleased?.();
+                // _.defer(() => hooks?.lockReleased?.());
                 end = performance.now();
+                logEvent('[lockCallback] -> finally');
                 console.log(`requestLock -> finally ${end - start}`);
               }
             },

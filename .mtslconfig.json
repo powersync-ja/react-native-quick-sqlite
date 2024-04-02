@@ -1,1 +1,1 @@
-{"ignore_dirs":["node_modules",".git","tests"]}
+{"ignore_dirs":[".git","node_modules","tests"]}

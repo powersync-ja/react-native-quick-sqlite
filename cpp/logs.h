@@ -36,3 +36,9 @@
   printf(" ");         \
   printf(__VA_ARGS__);
 #endif // ANDROID
+
+#include <chrono>
+using namespace std::chrono;
+
+milliseconds timestamp = duration_cast<milliseconds>(
+    system_clock::now().time_since_epoch());

@@ -1,6 +1,7 @@
 #include "ConnectionState.h"
 #include "fileUtils.h"
 #include "sqlite3.h"
+#include "logs.h"
 
 const std::string EMPTY_LOCK_ID = "";
 
@@ -8,7 +9,8 @@ SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,
                                    sqlite3 **db, int sqlOpenFlags);
 
 ConnectionState::ConnectionState(const std::string dbName,
-                                 const std::string docPath, int SQLFlags) {
+                                 const std::string docPath, int SQLFlags)
+{
   auto result = genericSqliteOpenDb(dbName, docPath, &connection, SQLFlags);
 
   this->clearLock();
@@ -16,38 +18,46 @@ ConnectionState::ConnectionState(const std::string dbName,
   thread = new std::thread(&ConnectionState::doWork, this);
 }
 
-ConnectionState::~ConnectionState() {
+ConnectionState::~ConnectionState()
+{
   // So threads know it's time to shut down
   threadDone = true;
 
   // Wake up all the threads, so they can finish and be joined
   workQueueConditionVariable.notify_all();
-  if (thread->joinable()) {
+  if (thread->joinable())
+  {
     thread->join();
   }
 
   delete thread;
 }
 
-void ConnectionState::clearLock() {
-  if (!workQueue.empty()) {
+void ConnectionState::clearLock()
+{
+  if (!workQueue.empty())
+  {
     waitFinished();
   }
   _currentLockId = EMPTY_LOCK_ID;
 }
 
-void ConnectionState::activateLock(const ConnectionLockId &lockId) {
+void ConnectionState::activateLock(const ConnectionLockId &lockId)
+{
   _currentLockId = lockId;
 }
 
-bool ConnectionState::matchesLock(const ConnectionLockId &lockId) {
+bool ConnectionState::matchesLock(const ConnectionLockId &lockId)
+{
   return _currentLockId == lockId;
 }
 
 bool ConnectionState::isEmptyLock() { return _currentLockId == EMPTY_LOCK_ID; }
 
-void ConnectionState::close() {
-  if (!workQueue.empty()) {
+void ConnectionState::close()
+{
+  if (!workQueue.empty())
+  {
     waitFinished();
   }
   // So that the thread can stop (if not already)
@@ -55,7 +65,8 @@ void ConnectionState::close() {
   sqlite3_close_v2(connection);
 }
 
-void ConnectionState::queueWork(std::function<void(sqlite3 *)> task) {
+void ConnectionState::queueWork(std::function<void(sqlite3 *)> task)
+{
   // Grab the mutex
   std::lock_guard<std::mutex> g(workQueueMutex);
 
@@ -66,22 +77,27 @@ void ConnectionState::queueWork(std::function<void(sqlite3 *)> task) {
   workQueueConditionVariable.notify_all();
 }
 
-void ConnectionState::doWork() {
+void ConnectionState::doWork()
+{
   // Loop while the queue is not destructing
-  while (!threadDone) {
+  LOGSIMPLE("[ConnectionState::doWork] %s", threadDone);
+  while (!threadDone)
+  {
+    LOGSIMPLE("[ConnectionState::doWork] while start %lld", timestamp);
     std::function<void(sqlite3 *)> task;
 
     // Create a scope, so we don't lock the queue for longer than necessary
     {
       std::unique_lock<std::mutex> g(workQueueMutex);
-      workQueueConditionVariable.wait(g, [&] {
+      workQueueConditionVariable.wait(g, [&]
+                                      {
         // Only wake up if there are elements in the queue or the program is
         // shutting down
-        return !workQueue.empty() || threadDone;
-      });
+        return !workQueue.empty() || threadDone; });
 
       // If we are shutting down exit without trying to process more work
-      if (threadDone) {
+      if (threadDone)
+      {
         break;
       }
 
@@ -95,23 +111,28 @@ void ConnectionState::doWork() {
     // Need to notify in order for waitFinished to be updated when
     // the queue is empty and not busy
     workQueueConditionVariable.notify_all();
+    LOGSIMPLE("[ConnectionState::doWork] while end %lld", timestamp);
   }
 }
 
-void ConnectionState::waitFinished() {
+void ConnectionState::waitFinished()
+{
   std::unique_lock<std::mutex> g(workQueueMutex);
   workQueueConditionVariable.wait(
-      g, [&] { return workQueue.empty() && (threadBusy == 0); });
+      g, [&]
+      { return workQueue.empty() && (threadBusy == 0); });
 }
 
 SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,
-                                   sqlite3 **db, int sqlOpenFlags) {
+                                   sqlite3 **db, int sqlOpenFlags)
+{
   string dbPath = get_db_path(dbName, docPath);
 
   int exit = 0;
   exit = sqlite3_open_v2(dbPath.c_str(), db, sqlOpenFlags, nullptr);
 
-  if (exit != SQLITE_OK) {
+  if (exit != SQLITE_OK)
+  {
     return SQLiteOPResult{.type = SQLiteError,
                           .errorMessage = sqlite3_errmsg(*db)};
   }

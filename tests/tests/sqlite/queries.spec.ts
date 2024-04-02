@@ -104,6 +104,9 @@ export function registerQueriesBaseTests() {
       await db.execute(
         'CREATE TABLE IF NOT EXISTS t1(id INTEGER PRIMARY KEY, a INTEGER, b INTEGER, c TEXT);'
       );
+      await db.execute(
+        'CREATE TABLE IF NOT EXISTS t2(id INTEGER PRIMARY KEY, a INTEGER, b INTEGER, c TEXT)'
+      );
     } catch (e) {
       console.warn('error on before each', e);
     }
@@ -113,14 +116,14 @@ export function registerQueriesBaseTests() {
     it('1000 INSERTs', async () => {
       let res: QueryResult;
       let start = performance.now();
-      // for (let i = 0; i < 1000; i++) {
-      const n = randomIntFromInterval(0, 100000);
-      res = await db.execute('INSERT INTO t1(a, b, c) VALUES(?, ?, ?)', [
-        0 + 1,
-        n,
-        numberName(n),
-      ]);
-      // }
+      for (let i = 0; i < 1000; i++) {
+        const n = randomIntFromInterval(0, 100000);
+        res = await db.execute('INSERT INTO t1(a, b, c) VALUES(?, ?, ?)', [
+          0 + i,
+          n,
+          numberName(n),
+        ]);
+      }
       let end = performance.now();
       console.log(`Duration: ${(end - start).toFixed(2)}`);
       //   const id = chance.integer();
@@ -138,6 +141,25 @@ export function registerQueriesBaseTests() {
       //   expect(res.rows?._array).to.eql([]);
       //   expect(res.rows?.length).to.equal(0);
       //   expect(res.rows?.item).to.be.a('function');
+    });
+
+    it('25000 INSERTs', async () => {
+      let res: QueryResult;
+      let start = performance.now();
+      await db.writeTransaction(async (tx) => {
+        for (let i = 0; i < 25000; ++i) {
+          const n = randomIntFromInterval(0, 100000);
+          await tx.execute(`INSERT INTO t2(a, b, c) VALUES(?, ?, ?)`, [
+            i + 1,
+            n,
+            numberName(n),
+          ]);
+        }
+      });
+      await db.execute('PRAGMA wal_checkpoint(RESTART)');
+      let end = performance.now();
+      let duration = end - start;
+      console.log(`25000 INSERTs :: ${duration}ms`);
     });
   });
 }

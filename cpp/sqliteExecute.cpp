@@ -1,29 +1,46 @@
 #include "sqliteExecute.h"
+#include "logs.h"
 
-void bindStatement(sqlite3_stmt *statement, vector<QuickValue> *values) {
+void bindStatement(sqlite3_stmt *statement, vector<QuickValue> *values)
+{
   size_t size = values->size();
-  if (size <= 0) {
+  if (size <= 0)
+  {
     return;
   }
 
-  for (int ii = 0; ii < size; ii++) {
+  for (int ii = 0; ii < size; ii++)
+  {
     int sqIndex = ii + 1;
     QuickValue value = values->at(ii);
     QuickDataType dataType = value.dataType;
-    if (dataType == NULL_VALUE) {
+    if (dataType == NULL_VALUE)
+    {
       sqlite3_bind_null(statement, sqIndex);
-    } else if (dataType == BOOLEAN) {
+    }
+    else if (dataType == BOOLEAN)
+    {
       sqlite3_bind_int(statement, sqIndex, value.booleanValue);
-    } else if (dataType == INTEGER) {
+    }
+    else if (dataType == INTEGER)
+    {
       sqlite3_bind_int(statement, sqIndex, (int)value.doubleOrIntValue);
-    } else if (dataType == DOUBLE) {
+    }
+    else if (dataType == DOUBLE)
+    {
       sqlite3_bind_double(statement, sqIndex, value.doubleOrIntValue);
-    } else if (dataType == INT64) {
+    }
+    else if (dataType == INT64)
+    {
       sqlite3_bind_int64(statement, sqIndex, value.int64Value);
-    } else if (dataType == TEXT) {
+    }
+    else if (dataType == TEXT)
+    {
       sqlite3_bind_text(statement, sqIndex, value.textValue.c_str(),
                         value.textValue.length(), SQLITE_TRANSIENT);
-    } else if (dataType == ARRAY_BUFFER) {
+    }
+    else if (dataType == ARRAY_BUFFER)
+    {
       sqlite3_bind_blob(statement, sqIndex, value.arrayBufferValue.get(),
                         value.arrayBufferSize, SQLITE_STATIC);
     }
@@ -34,7 +51,9 @@ SQLiteOPResult
 sqliteExecuteWithDB(sqlite3 *db, std::string const &query,
                     std::vector<QuickValue> *params,
                     std::vector<map<std::string, QuickValue>> *results,
-                    std::vector<QuickColumnMetadata> *metadata) {
+                    std::vector<QuickColumnMetadata> *metadata)
+{
+  LOGSIMPLE("[sqliteExecuteWithDB] start: %lld", timestamp);
   sqlite3_stmt *statement;
 
   int statementStatus =
@@ -44,7 +63,9 @@ sqliteExecuteWithDB(sqlite3 *db, std::string const &query,
       SQLITE_OK) // statemnet is correct, bind the passed parameters
   {
     bindStatement(statement, params);
-  } else {
+  }
+  else
+  {
     const char *message = sqlite3_errmsg(db);
     return SQLiteOPResult{
         .type = SQLiteError,
@@ -60,12 +81,15 @@ sqliteExecuteWithDB(sqlite3 *db, std::string const &query,
   std::string column_name, column_declared_type;
   std::map<string, QuickValue> row;
 
-  while (isConsuming) {
+  while (isConsuming)
+  {
     result = sqlite3_step(statement);
 
-    switch (result) {
+    switch (result)
+    {
     case SQLITE_ROW:
-      if (results == NULL) {
+      if (results == NULL)
+      {
         break;
       }
 
@@ -73,13 +97,16 @@ sqliteExecuteWithDB(sqlite3 *db, std::string const &query,
       row = std::map<std::string, QuickValue>();
       count = sqlite3_column_count(statement);
 
-      while (i < count) {
+      while (i < count)
+      {
         column_type = sqlite3_column_type(statement, i);
         column_name = sqlite3_column_name(statement, i);
 
-        switch (column_type) {
+        switch (column_type)
+        {
 
-        case SQLITE_INTEGER: {
+        case SQLITE_INTEGER:
+        {
           /**
            * It's not possible to send a int64_t in a jsi::Value because JS
            * cannot represent the whole number range. Instead, we're sending a
@@ -94,13 +121,15 @@ sqliteExecuteWithDB(sqlite3 *db, std::string const &query,
           break;
         }
 
-        case SQLITE_FLOAT: {
+        case SQLITE_FLOAT:
+        {
           double column_value = sqlite3_column_double(statement, i);
           row[column_name] = createDoubleQuickValue(column_value);
           break;
         }
 
-        case SQLITE_TEXT: {
+        case SQLITE_TEXT:
+        {
           const char *column_value =
               reinterpret_cast<const char *>(sqlite3_column_text(statement, i));
           int byteLen = sqlite3_column_bytes(statement, i);
@@ -111,7 +140,8 @@ sqliteExecuteWithDB(sqlite3 *db, std::string const &query,
           break;
         }
 
-        case SQLITE_BLOB: {
+        case SQLITE_BLOB:
+        {
           int blob_size = sqlite3_column_bytes(statement, i);
           const void *blob = sqlite3_column_blob(statement, i);
           uint8_t *data;
@@ -131,10 +161,12 @@ sqliteExecuteWithDB(sqlite3 *db, std::string const &query,
       results->push_back(move(row));
       break;
     case SQLITE_DONE:
-      if (metadata != NULL) {
+      if (metadata != NULL)
+      {
         i = 0;
         count = sqlite3_column_count(statement);
-        while (i < count) {
+        while (i < count)
+        {
           column_name = sqlite3_column_name(statement, i);
           const char *tp = sqlite3_column_decltype(statement, i);
           column_declared_type = tp != NULL ? tp : "UNKNOWN";
@@ -158,7 +190,8 @@ sqliteExecuteWithDB(sqlite3 *db, std::string const &query,
 
   sqlite3_finalize(statement);
 
-  if (isFailed) {
+  if (isFailed)
+  {
     const char *message = sqlite3_errmsg(db);
     return SQLiteOPResult{
         .type = SQLiteError,
@@ -170,13 +203,15 @@ sqliteExecuteWithDB(sqlite3 *db, std::string const &query,
 
   int changedRowCount = sqlite3_changes(db);
   long long latestInsertRowId = sqlite3_last_insert_rowid(db);
+  LOGSIMPLE("[sqliteExecuteWithDB] end: %lld", timestamp);
   return SQLiteOPResult{.type = SQLiteOk,
                         .rowsAffected = changedRowCount,
                         .insertId = static_cast<double>(latestInsertRowId)};
 }
 
 SequelLiteralUpdateResult sqliteExecuteLiteralWithDB(sqlite3 *db,
-                                                     string const &query) {
+                                                     string const &query)
+{
   // SQLite statements need to be compiled before executed
   sqlite3_stmt *statement;
 
@@ -200,10 +235,12 @@ SequelLiteralUpdateResult sqliteExecuteLiteralWithDB(sqlite3 *db,
   int result, i, count, column_type;
   string column_name;
 
-  while (isConsuming) {
+  while (isConsuming)
+  {
     result = sqlite3_step(statement);
 
-    switch (result) {
+    switch (result)
+    {
     case SQLITE_ROW:
       isConsuming = true;
       break;
@@ -220,7 +257,8 @@ SequelLiteralUpdateResult sqliteExecuteLiteralWithDB(sqlite3 *db,
 
   sqlite3_finalize(statement);
 
-  if (isFailed) {
+  if (isFailed)
+  {
     const char *message = sqlite3_errmsg(db);
     return {SQLiteError,
             "[react-native-quick-sqlite] SQL execution error: " +
