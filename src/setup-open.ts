@@ -122,7 +122,6 @@ export function setupOpen(QuickSQLite: ISQLite) {
                 closeContextLock(dbName, id);
                 resolve(res)
               } catch (ex) {
-                closeContextLock(dbName, id);
                 reject(ex)
               } finally {
                 hooks?.lockReleased?.()

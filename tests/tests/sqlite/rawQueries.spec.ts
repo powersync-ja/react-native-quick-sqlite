@@ -607,7 +607,8 @@ export function registerBaseTests() {
       await db.execute('PRAGMA wal_checkpoint(RESTART)');
       let end = performance.now();
       let duration = end - start;
-      console.log(`10000 INSERTs :: ${duration}ms`);
+      
+      expect(duration).lessThan(2000);
     });
   });
 }
