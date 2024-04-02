@@ -11,6 +11,7 @@ import {
 } from 'react-native-quick-sqlite';
 import { beforeEach, describe, it } from '../mocha/MochaRNAdapter';
 import chai from 'chai';
+import { randomIntFromInterval, numberName } from './utils';
 
 const { expect } = chai;
 const chance = new Chance();
@@ -62,6 +63,8 @@ export function registerBaseTests() {
 
       await db.execute('DROP TABLE IF EXISTS User; ');
       await db.execute('CREATE TABLE User ( id INT PRIMARY KEY, name TEXT NOT NULL, age INT, networth REAL) STRICT;');
+
+      await db.execute('CREATE TABLE IF NOT EXISTS t1(id INTEGER PRIMARY KEY, a INTEGER, b INTEGER, c TEXT)');
     } catch (e) {
       console.warn('error on before each', e);
     }
@@ -589,6 +592,23 @@ export function registerBaseTests() {
       QuickSQLite.delete('single_connection');
 
       expect(result.rows?.length).to.equal(1);
+    });
+
+    it('10000 INSERTs', async () => {
+      let start = performance.now();
+      for (let i = 0; i < 1000; ++i) {
+        const n = randomIntFromInterval(0, 100000);
+        await db.execute(`INSERT INTO t1(a, b, c) VALUES(?, ?, ?)`, [
+          i + 1,
+          n,
+          numberName(n),
+        ]);
+      }
+      await db.execute('PRAGMA wal_checkpoint(RESTART)');
+      let end = performance.now();
+      let duration = end - start;
+      
+      expect(duration).lessThan(2000);
     });
   });
 }

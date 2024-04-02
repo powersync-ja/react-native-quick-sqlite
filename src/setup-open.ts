@@ -68,9 +68,6 @@ global.onLockContextIsAvailable = async (dbName: string, lockId: ContextLockID) 
       });
     } catch (ex) {
       console.error(ex);
-    } finally {
-      // Always release a lock once finished
-      closeContextLock(dbName, lockId);
     }
   });
 };
@@ -119,12 +116,13 @@ export function setupOpen(QuickSQLite: ISQLite) {
                 await hooks?.lockAcquired?.();
                 const res = await callback(context);
 
-                // Ensure that we only resolve after locks are freed
-                _.defer(() => resolve(res));
+                closeContextLock(dbName, id);
+                resolve(res)
               } catch (ex) {
-                _.defer(() => reject(ex));
+                closeContextLock(dbName, id);
+                reject(ex)
               } finally {
-                _.defer(() => hooks?.lockReleased?.());
+                hooks?.lockReleased?.()
               }
             }
           } as LockCallbackRecord);
