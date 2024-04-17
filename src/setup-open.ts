@@ -12,7 +12,7 @@ import {
   QueryResult
 } from './types';
 
-import uuid from 'uuid';
+import { v4 } from 'uuid';
 import _ from 'lodash';
 import { enhanceQueryResult } from './utils';
 import { DBListenerManagerInternal } from './DBListenerManager';
@@ -106,7 +106,7 @@ export function setupOpen(QuickSQLite: ISQLite) {
         options?: LockOptions,
         hooks?: LockHooks
       ): Promise<T> => {
-        const id = uuid.v4(); // TODO maybe do this in C++
+        const id = v4(); // TODO maybe do this in C++
         // Wrap the callback in a promise that will resolve to the callback result
         return new Promise<T>((resolve, reject) => {
           // Add callback to the queue for timing
