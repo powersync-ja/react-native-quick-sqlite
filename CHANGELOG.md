@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 1.1.4
+
+### Patch Changes
+
+- a1a7dec: Updated UUID dependency.
+
 ## 1.1.3
 
 ### Patch Changes
