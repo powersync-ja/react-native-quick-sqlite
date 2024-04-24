@@ -11,8 +11,8 @@ include_directories(
 )
 
 add_definitions(
-  ${SQLITE_FLAGS}
   -DSQLITE_TEMP_STORE=2
+  ${SQLITE_FLAGS}
 )
 
 add_library(
