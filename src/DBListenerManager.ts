@@ -53,9 +53,10 @@ export class DBListenerManagerInternal extends DBListenerManager {
     registerUpdateHook(this.options.dbName, (update) => this.handleTableUpdates(update));
     registerTransactionHook(this.options.dbName, (eventType) => {
       switch (eventType) {
-        case TransactionEvent.COMMIT:
-          this.flushUpdates();
-          break;
+        /**
+         * COMMIT hooks occur before the commit is completed. This leads to race conditions.
+         * Only use the rollback event to clear updates.
+         */ 
         case TransactionEvent.ROLLBACK:
           this.transactionReverted();
           break;

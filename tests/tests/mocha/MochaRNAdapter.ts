@@ -2,7 +2,7 @@ import 'mocha';
 import type * as MochaTypes from 'mocha';
 
 export const rootSuite = new Mocha.Suite('') as MochaTypes.Suite;
-rootSuite.timeout(10 * 1000);
+rootSuite.timeout(60 * 1000);
 
 let mochaContext = rootSuite;
 

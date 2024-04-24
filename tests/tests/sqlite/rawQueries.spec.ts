@@ -566,15 +566,22 @@ export function registerBaseTests() {
       // Execute the read test whenever a table change ocurred
       db.registerTablesChangedHook((update) => readTriggerCallbacks.forEach((cb) => cb()));
 
+      // Needed for large volumes of data on older Android devices 
+      // https://github.com/margelo/react-native-quick-sqlite/pull/25
+      await db.execute('PRAGMA temp_store = memory;')
+      const numberOfUsers = 100_000;
       await db.writeLock(async (tx) => {
         await tx.execute('BEGIN');
-        await createTestUser(tx);
+        // Creates 100,000 Users
+       for (let i = 0; i < numberOfUsers; i++) {
+        await tx.execute('INSERT INTO User (id, name, age, networth) VALUES(?, ?, ?, ?)', [i, 'steven', i, 0])
+       }
         await tx.execute('COMMIT');
       });
 
       const resolved = await Promise.all(readerPromises);
       // The query result length for 1 item should be returned for all connections
-      expect(resolved).to.deep.equal(readerPromises.map(() => 1));
+      expect(resolved).to.deep.equal(readerPromises.map(() => numberOfUsers));
     });
 
     it('Should attach DBs', async () => {
