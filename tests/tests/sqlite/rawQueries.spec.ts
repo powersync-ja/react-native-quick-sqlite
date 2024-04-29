@@ -566,9 +566,6 @@ export function registerBaseTests() {
       // Execute the read test whenever a table change ocurred
       db.registerTablesChangedHook((update) => readTriggerCallbacks.forEach((cb) => cb()));
 
-      // Needed for large volumes of data on older Android devices 
-      // https://github.com/margelo/react-native-quick-sqlite/pull/25
-      await db.execute('PRAGMA temp_store = memory;')
       const numberOfUsers = 100_000;
       await db.writeLock(async (tx) => {
         await tx.execute('BEGIN');
