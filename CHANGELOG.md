@@ -1,5 +1,12 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 1.1.5
+
+### Patch Changes
+
+- 40c6dd0: Fix race condition where table change notications would trigger before COMMIT had completed.
+- 2165048: Use memory temp_store
+
 ## 1.1.4
 
 ### Patch Changes
