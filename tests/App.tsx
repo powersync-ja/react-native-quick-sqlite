@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from 'react';
 import { SafeAreaView, ScrollView, Text } from 'react-native';
 import 'reflect-metadata';
-import 'react-native-get-random-values';
 
 import { registerBaseTests, runTests } from './tests/index';
 const TEST_SERVER_URL = 'http://localhost:4243/results';
@@ -21,7 +20,7 @@ export default function App() {
       await fetch(TEST_SERVER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(results)
+        body: JSON.stringify(results),
       });
     } catch (ex) {
       console.error(ex);
@@ -32,9 +31,9 @@ export default function App() {
         body: JSON.stringify([
           {
             description: `Caught exception: ${ex}`,
-            type: 'incorrect'
-          }
-        ])
+            type: 'incorrect',
+          },
+        ]),
       });
     }
   }, []);
@@ -47,7 +46,9 @@ export default function App() {
   return (
     <SafeAreaView className="flex-1 bg-neutral-900">
       <ScrollView className="p-4">
-        <Text className="font-bold text-blue-500 text-lg text-center">RN Quick SQLite Test Suite</Text>
+        <Text className="font-bold text-blue-500 text-lg text-center">
+          RN Quick SQLite Test Suite
+        </Text>
         {results.map((r: any, i: number) => {
           if (r.type === 'grouping') {
             return (

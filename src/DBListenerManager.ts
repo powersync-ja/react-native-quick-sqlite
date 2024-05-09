@@ -1,11 +1,10 @@
-import _ from 'lodash';
 import { registerTransactionHook, registerUpdateHook } from './table-updates';
 import {
   BatchedUpdateCallback,
   BatchedUpdateNotification,
   TransactionEvent,
   UpdateCallback,
-  UpdateNotification
+  UpdateNotification,
 } from './types';
 import { BaseListener, BaseObserver } from './utils/BaseObserver';
 
@@ -50,13 +49,15 @@ export class DBListenerManagerInternal extends DBListenerManager {
   constructor(protected options: DBListenerManagerOptions) {
     super();
     this.updateBuffer = [];
-    registerUpdateHook(this.options.dbName, (update) => this.handleTableUpdates(update));
+    registerUpdateHook(this.options.dbName, (update) =>
+      this.handleTableUpdates(update)
+    );
     registerTransactionHook(this.options.dbName, (eventType) => {
       switch (eventType) {
         /**
          * COMMIT hooks occur before the commit is completed. This leads to race conditions.
          * Only use the rollback event to clear updates.
-         */ 
+         */
         case TransactionEvent.ROLLBACK:
           this.transactionReverted();
           break;
@@ -64,7 +65,7 @@ export class DBListenerManagerInternal extends DBListenerManager {
 
       this.iterateListeners((l) =>
         l.writeTransaction?.({
-          type: eventType
+          type: eventType,
         })
       );
     });
@@ -75,11 +76,20 @@ export class DBListenerManagerInternal extends DBListenerManager {
       return;
     }
 
-    const groupedUpdates = _.groupBy(this.updateBuffer, (update) => update.table);
+    const groupedUpdates = this.updateBuffer.reduce(
+      (grouping: Record<string, UpdateNotification[]>, update) => {
+        const { table } = update;
+        const updateGroup = grouping[table] || (grouping[table] = []);
+        updateGroup.push(update);
+        return grouping;
+      },
+      {}
+    );
+
     const batchedUpdate: BatchedUpdateNotification = {
       groupedUpdates,
       rawUpdates: this.updateBuffer,
-      tables: _.keys(groupedUpdates)
+      tables: Object.keys(groupedUpdates),
     };
     this.updateBuffer = [];
     this.iterateListeners((l) => l.tablesUpdated?.(batchedUpdate));
