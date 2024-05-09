@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from 'react';
 import { SafeAreaView, ScrollView, Text } from 'react-native';
 import 'reflect-metadata';
-import 'react-native-get-random-values';
 
 import { registerBaseTests, runTests } from './tests/index';
 const TEST_SERVER_URL = 'http://localhost:4243/results';

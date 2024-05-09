@@ -12,8 +12,6 @@ import {
   QueryResult
 } from './types';
 
-import { v4 } from 'uuid';
-import _ from 'lodash';
 import { enhanceQueryResult } from './utils';
 import { DBListenerManagerInternal } from './DBListenerManager';
 import { LockHooks } from './lock-hooks';
@@ -29,6 +27,14 @@ enum TransactionFinalizer {
 }
 
 const DEFAULT_READ_CONNECTIONS = 4;
+
+// A incrementing integer ID for tracking lock requests
+let requestIdCounter = 1;
+
+const getRequestId = () => {
+  requestIdCounter++;
+  return `${requestIdCounter}`;
+};
 
 const LockCallbacks: Record<ContextLockID, LockCallbackRecord> = {};
 let proxy: ISQLite;
@@ -106,7 +112,7 @@ export function setupOpen(QuickSQLite: ISQLite) {
         options?: LockOptions,
         hooks?: LockHooks
       ): Promise<T> => {
-        const id = v4(); // TODO maybe do this in C++
+        const id = getRequestId();
         // Wrap the callback in a promise that will resolve to the callback result
         return new Promise<T>((resolve, reject) => {
           // Add callback to the queue for timing

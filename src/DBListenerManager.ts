@@ -1,4 +1,3 @@
-import _ from 'lodash';
 import { registerTransactionHook, registerUpdateHook } from './table-updates';
 import {
   BatchedUpdateCallback,
@@ -75,11 +74,17 @@ export class DBListenerManagerInternal extends DBListenerManager {
       return;
     }
 
-    const groupedUpdates = _.groupBy(this.updateBuffer, (update) => update.table);
+    const groupedUpdates = this.updateBuffer.reduce((grouping: Record<string, UpdateNotification[]>, update) => {
+      const { table } = update;
+      const updateGroup = grouping[table] || (grouping[table] = []);
+      updateGroup.push(update);
+      return grouping;
+    }, {});
+
     const batchedUpdate: BatchedUpdateNotification = {
       groupedUpdates,
       rawUpdates: this.updateBuffer,
-      tables: _.keys(groupedUpdates)
+      tables: Object.keys(groupedUpdates)
     };
     this.updateBuffer = [];
     this.iterateListeners((l) => l.tablesUpdated?.(batchedUpdate));
