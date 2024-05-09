@@ -28,6 +28,14 @@ enum TransactionFinalizer {
 
 const DEFAULT_READ_CONNECTIONS = 4;
 
+// A incrementing integer ID for tracking lock requests
+let requestIdCounter = 1;
+
+const getRequestId = () => {
+  requestIdCounter++;
+  return `${requestIdCounter}`;
+};
+
 const LockCallbacks: Record<ContextLockID, LockCallbackRecord> = {};
 let proxy: ISQLite;
 
@@ -94,12 +102,6 @@ export function setupOpen(QuickSQLite: ISQLite) {
 
       const listenerManager = new DBListenerManagerInternal({ dbName });
 
-      // A incrementing integer ID for tracking lock requests
-      let requestIdCounter = 1;
-      const getRequestId = () => {
-        requestIdCounter++;
-        return `${requestIdCounter}`;
-      };
       /**
        * Wraps lock requests and their callbacks in order to resolve the lock
        * request with the callback result once triggered from the connection pool.
