@@ -1,10 +1,3 @@
-//   _________     _______  ______ ____  _____  __  __            _____ _____
-//  |__   __\ \   / /  __ \|  ____/ __ \|  __ \|  \/  |     /\   |  __ \_   _|
-//     | |   \ \_/ /| |__) | |__ | |  | | |__) | \  / |    /  \  | |__) || |
-//     | |    \   / |  ___/|  __|| |  | |  _  /| |\/| |   / /\ \ |  ___/ | |
-//     | |     | |  | |    | |___| |__| | | \ \| |  | |  / ____ \| |    _| |_
-//     |_|     |_|  |_|    |______\____/|_|  \_\_|  |_| /_/    \_\_|   |_____|
-
 import { QueryResult, TransactionContext, Open } from './types';
 
 /**
@@ -37,9 +30,7 @@ export const setupTypeORMDriver = (open: Open) => ({
             fail(e);
           }
         },
-        transaction: (
-          fn: (tx: TransactionContext) => Promise<void>
-        ): Promise<void> => {
+        transaction: (fn: (tx: TransactionContext) => Promise<void>): Promise<void> => {
           return _con.writeTransaction(fn);
         },
         close: (ok: any, fail: any) => {
@@ -50,19 +41,14 @@ export const setupTypeORMDriver = (open: Open) => ({
             fail(e);
           }
         },
-        attach: (
-          dbNameToAttach: string,
-          alias: string,
-          location: string | undefined,
-          callback: () => void
-        ) => {
+        attach: (dbNameToAttach: string, alias: string, location: string | undefined, callback: () => void) => {
           _con.attach(dbNameToAttach, alias, location);
           callback();
         },
         detach: (alias, callback: () => void) => {
           _con.detach(alias);
           callback();
-        },
+        }
       };
 
       ok(connection);
@@ -71,5 +57,5 @@ export const setupTypeORMDriver = (open: Open) => ({
     } catch (e) {
       fail(e);
     }
-  },
+  }
 });

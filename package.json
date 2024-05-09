@@ -29,6 +29,7 @@
   "scripts": {
     "build": "bob build",
     "clean": "rm -rf lib tsconfig.tsbuildinfo",
+    "format": "prettier --write .",
     "typescript": "tsc --noEmit",
     "prepare": "bob build",
     "example": "yarn --cwd example",
@@ -48,6 +49,7 @@
   "homepage": "https://github.com/margelo/react-native-quick-sqlite#readme",
   "devDependencies": {
     "@changesets/cli": "^2.26.2",
+    "prettier": "^3.2.4",
     "react": "18.2.0",
     "react-native": "0.71.0",
     "react-native-builder-bob": "^0.18.2",
@@ -56,13 +58,6 @@
   "peerDependencies": {
     "react": "*",
     "react-native": "*"
-  },
-  "prettier": {
-    "quoteProps": "consistent",
-    "singleQuote": true,
-    "tabWidth": 2,
-    "trailingComma": "es5",
-    "useTabs": false
   },
   "react-native-builder-bob": {
     "source": "src",

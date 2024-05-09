@@ -22,8 +22,8 @@ config.resolver.unstable_enableSymlinks = true;
 config.transformer.getTransformOptions = async () => ({
   transform: {
     experimentalImportSupport: false,
-    inlineRequires: true,
-  },
+    inlineRequires: true
+  }
 });
 
 module.exports = config;

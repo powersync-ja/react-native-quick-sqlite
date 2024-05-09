@@ -6,9 +6,7 @@ export type BaseListener = {
   [key: string]: (...event: any) => any;
 };
 
-export class BaseObserver<T extends BaseListener = BaseListener>
-  implements BaseObserverInterface<T>
-{
+export class BaseObserver<T extends BaseListener = BaseListener> implements BaseObserverInterface<T> {
   protected listeners: Set<Partial<T>>;
 
   constructor() {
