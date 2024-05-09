@@ -37,32 +37,10 @@ export function assertAlways(condition: boolean) {
   }
 }
 
-const digits = [
-  '',
-  'one',
-  'two',
-  'three',
-  'four',
-  'five',
-  'six',
-  'seven',
-  'eight',
-  'nine',
-];
+const digits = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 const names100: string[] = [
   ...digits,
-  ...[
-    'ten',
-    'eleven',
-    'twelve',
-    'thirteen',
-    'fourteen',
-    'fifteen',
-    'sixteen',
-    'seventeen',
-    'eighteen',
-    'nineteen',
-  ],
+  ...['ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'],
   ...digits.map((digit) => `twenty${digit != '' ? '-' + digit : ''}`),
   ...digits.map((digit) => `thirty${digit != '' ? '-' + digit : ''}`),
   ...digits.map((digit) => `forty${digit != '' ? '-' + digit : ''}`),
@@ -70,5 +48,5 @@ const names100: string[] = [
   ...digits.map((digit) => `sixty${digit != '' ? '-' + digit : ''}`),
   ...digits.map((digit) => `seventy${digit != '' ? '-' + digit : ''}`),
   ...digits.map((digit) => `eighty${digit != '' ? '-' + digit : ''}`),
-  ...digits.map((digit) => `ninety${digit != '' ? '-' + digit : ''}`),
+  ...digits.map((digit) => `ninety${digit != '' ? '-' + digit : ''}`)
 ];

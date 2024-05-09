@@ -117,12 +117,12 @@ export function setupOpen(QuickSQLite: ISQLite) {
                 const res = await callback(context);
 
                 closeContextLock(dbName, id);
-                resolve(res)
+                resolve(res);
               } catch (ex) {
                 closeContextLock(dbName, id);
-                reject(ex)
+                reject(ex);
               } finally {
-                hooks?.lockReleased?.()
+                hooks?.lockReleased?.();
               }
             }
           } as LockCallbackRecord);

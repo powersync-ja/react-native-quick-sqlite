@@ -56,11 +56,7 @@ program
 
 program
   .command('run-ios')
-  .option(
-    '--simulatorName <name>',
-    'The iOS simulator name (e.g., "iPhone 11")',
-    DEFAULT_SIMULATOR_NAME
-  )
+  .option('--simulatorName <name>', 'The iOS simulator name (e.g., "iPhone 11")', DEFAULT_SIMULATOR_NAME)
   .option('--port', 'Port to run Express HTTP server for getting results on.', DEFAULT_PORT)
   .action(async (str, options) => {
     const opts = options.opts();
@@ -78,7 +74,7 @@ program
 
     /** Listen for results */
     const server = app.listen(port);
-    
+
     /** Build and run the Expo app, don't await this, we will await a response. */
     spawnP('Build Expo App', 'yarn', ['ios']);
 
@@ -136,7 +132,7 @@ async function getADBDeviceName(avdName) {
 }
 
 async function getSimulatorDeviceName(simulatorName) {
-  try {    
+  try {
     const devicesOutput = await spawnP('List iOS Simulators', 'xcrun', ['simctl', 'list', 'devices', 'x']);
     const deviceNames = _.chain(devicesOutput.split('\n'))
       .map((line) => line.trim())
