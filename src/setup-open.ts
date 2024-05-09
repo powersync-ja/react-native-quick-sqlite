@@ -98,9 +98,6 @@ export function setupOpen(QuickSQLite: ISQLite) {
       let requestIdCounter = 1;
       const getRequestId = () => {
         requestIdCounter++;
-        if (requestIdCounter >= Number.MAX_SAFE_INTEGER) {
-          requestIdCounter = 0;
-        }
         return `${requestIdCounter}`;
       };
       /**
