@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 1.1.6
+
+### Patch Changes
+
+- 634c9c2: Removed the requirement for `lodash` and `uuid` packages.
+
 ## 1.1.5
 
 ### Patch Changes
