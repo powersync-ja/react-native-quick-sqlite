@@ -122,8 +122,8 @@ jobs:
         run: |
           cd tests
           yarn install --frozen-lockfile
-      
-      - name: Install Cocoapods 
+
+      - name: Install Cocoapods
         run: |
           cd tests/ios && pod install
 

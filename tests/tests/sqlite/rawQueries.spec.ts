@@ -23,7 +23,12 @@ let db: QuickSQLiteConnection = global.db;
 const NUM_READ_CONNECTIONS = 3;
 
 function generateUserInfo() {
-  return { id: chance.integer(), name: chance.name(), age: chance.integer(), networth: chance.floating() };
+  return {
+    id: chance.integer(),
+    name: chance.name(),
+    age: chance.integer(),
+    networth: chance.floating()
+  };
 }
 
 function createTestUser(context: { execute: (sql: string, args?: any[]) => Promise<QueryResult> } = db) {
@@ -59,7 +64,9 @@ export function registerBaseTests() {
         db.delete();
       }
 
-      global.db = db = open('test', { numReadConnections: NUM_READ_CONNECTIONS });
+      global.db = db = open('test', {
+        numReadConnections: NUM_READ_CONNECTIONS
+      });
 
       await db.execute('DROP TABLE IF EXISTS User; ');
       await db.execute('CREATE TABLE User ( id INT PRIMARY KEY, name TEXT NOT NULL, age INT, networth REAL) STRICT;');
@@ -480,7 +487,9 @@ export function registerBaseTests() {
     });
 
     it('Should open a db without concurrency', async () => {
-      const singleConnection = open('single_connection', { numReadConnections: 0 });
+      const singleConnection = open('single_connection', {
+        numReadConnections: 0
+      });
 
       const [p1, p2] = [
         singleConnection.writeLock(async () => {
@@ -570,9 +579,9 @@ export function registerBaseTests() {
       await db.writeLock(async (tx) => {
         await tx.execute('BEGIN');
         // Creates 100,000 Users
-       for (let i = 0; i < numberOfUsers; i++) {
-        await tx.execute('INSERT INTO User (id, name, age, networth) VALUES(?, ?, ?, ?)', [i, 'steven', i, 0])
-       }
+        for (let i = 0; i < numberOfUsers; i++) {
+          await tx.execute('INSERT INTO User (id, name, age, networth) VALUES(?, ?, ?, ?)', [i, 'steven', i, 0]);
+        }
         await tx.execute('COMMIT');
       });
 
@@ -582,7 +591,9 @@ export function registerBaseTests() {
     });
 
     it('Should attach DBs', async () => {
-      const singleConnection = open('single_connection', { numReadConnections: 0 });
+      const singleConnection = open('single_connection', {
+        numReadConnections: 0
+      });
       await singleConnection.execute('DROP TABLE IF EXISTS Places; ');
       await singleConnection.execute('CREATE TABLE Places ( id INT PRIMARY KEY, name TEXT NOT NULL) STRICT;');
       await singleConnection.execute('INSERT INTO "Places" (id, name) VALUES(0, "Beverly Hills")');
@@ -602,16 +613,12 @@ export function registerBaseTests() {
       let start = performance.now();
       for (let i = 0; i < 1000; ++i) {
         const n = randomIntFromInterval(0, 100000);
-        await db.execute(`INSERT INTO t1(a, b, c) VALUES(?, ?, ?)`, [
-          i + 1,
-          n,
-          numberName(n),
-        ]);
+        await db.execute(`INSERT INTO t1(a, b, c) VALUES(?, ?, ?)`, [i + 1, n, numberName(n)]);
       }
       await db.execute('PRAGMA wal_checkpoint(RESTART)');
       let end = performance.now();
       let duration = end - start;
-      
+
       expect(duration).lessThan(2000);
     });
   });
