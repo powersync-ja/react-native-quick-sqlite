@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 1.1.7
+
+### Patch Changes
+
+- 421bcbd: The default minimum SDK for Expo 51 is 23, so attempting to compile with our package using 21 would result in a build error.
+
 ## 1.1.6
 
 ### Patch Changes
