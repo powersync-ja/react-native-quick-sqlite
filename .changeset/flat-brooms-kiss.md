@@ -2,4 +2,4 @@
 '@journeyapps/react-native-quick-sqlite': patch
 ---
 
-Upgrade Android minSdk version to 23
+The default minimum SDK for Expo 51 is 23, so attempting to compile with our package using 21 would result in a build error.
