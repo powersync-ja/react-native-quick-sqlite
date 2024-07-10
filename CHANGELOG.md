@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 1.1.8
+
+### Patch Changes
+
+- f072d10: Silencing transactions that are reporting on failed rollback exceptions when they are safe to ignore.
+
 ## 1.1.7
 
 ### Patch Changes
