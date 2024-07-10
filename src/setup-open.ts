@@ -212,7 +212,12 @@ export function setupOpen(QuickSQLite: ISQLite) {
           }
           return res;
         } catch (ex) {
-          await rollback();
+          try {
+            await rollback();
+          } catch (ex2) {
+            // In rare cases, a rollback may fail.
+            // Safe to ignore.
+          }
           throw ex;
         }
       };
