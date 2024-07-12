@@ -1,5 +1,11 @@
 # @powersync/react-native-quick-sqlite
 
+## 1.2.0
+
+### Minor Changes
+
+- f9d83cc: Move package to @powersync/react-native-quick-sqlite
+
 ## For the following previous versions refer to `@journeyapps/react-native-quick-sqlite`
 
 ## 1.1.8
