@@ -1,5 +1,5 @@
 {
-  "name": "@journeyapps/react-native-quick-sqlite",
+  "name": "@powersync/react-native-quick-sqlite",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"
@@ -40,13 +40,13 @@
     "ios",
     "android"
   ],
-  "repository": "https://github.com/margelo/react-native-quick-sqlite",
+  "repository": "https://github.com/powersync-ja/react-native-quick-sqlite",
   "author": "JOURNEYAPPS",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/margelo/react-native-quick-sqlite/issues"
+    "url": "https://github.com/powersync-ja/react-native-quick-sqlite/issues"
   },
-  "homepage": "https://github.com/margelo/react-native-quick-sqlite#readme",
+  "homepage": "https://github.com/powersync-ja/react-native-quick-sqlite#readme",
   "devDependencies": {
     "@changesets/cli": "^2.26.2",
     "prettier": "^3.2.4",
