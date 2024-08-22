@@ -49,6 +49,7 @@ set_target_properties(
 
 find_package(ReactAndroid REQUIRED CONFIG)
 find_package(fbjni REQUIRED CONFIG)
+find_package(powersync_sqlite_core REQUIRED CONFIG)
 find_library(LOG_LIB log)
 
 if(${USE_HERMES})
@@ -67,5 +68,5 @@ target_link_libraries(
   ReactAndroid::react_nativemodule_core
   ${JSEXECUTOR_LIB}
   android
-  powersync ${CMAKE_SOURCE_DIR}/src/main/jniLibs/${CMAKE_ANDROID_ARCH_ABI}/libpowersync.so
+  powersync_sqlite_core::powersync
 )

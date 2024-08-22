@@ -10,6 +10,8 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <powersync>
+
 using namespace std;
 using namespace facebook;
 
@@ -17,11 +19,6 @@ namespace osp {
 string docPathStr;
 std::shared_ptr<react::CallInvoker> invoker;
 jsi::Runtime *runtime;
-
-extern "C" {
-int sqlite3_powersync_init(sqlite3 *db, char **pzErrMsg,
-                           const sqlite3_api_routines *pApi);
-}
 
 /**
  * This function loads the PowerSync extension into SQLite

@@ -109,6 +109,7 @@ android {
 }
 
 dependencies {
+  implementation 'co.powersync:powersync-sqlite-core:0.2.0'
   //noinspection GradleDynamicVersion
   implementation 'com.facebook.react:react-android:+'
 }
