@@ -1,5 +1,12 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 1.3.0
+
+### Minor Changes
+
+- 11fc707: Rename back to @journeyapps/react-native-quick-sqlite for now
+- 5f70fd2: Use powersync-sqlite-core 0.2.1
+
 ## 1.2.0
 
 ### Minor Changes
