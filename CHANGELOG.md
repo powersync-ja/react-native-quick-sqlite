@@ -1,4 +1,4 @@
-# @powersync/react-native-quick-sqlite
+# @journeyapps/react-native-quick-sqlite
 
 ## 1.2.0
 

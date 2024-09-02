@@ -1,5 +1,5 @@
 {
-  "name": "@powersync/react-native-quick-sqlite",
+  "name": "@journeyapps/react-native-quick-sqlite",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"
