@@ -77,6 +77,14 @@ export function registerBaseTests() {
     }
   });
 
+  describe('PowerSync', () => {
+    it('should load the extension', async () => {
+      const rs = await db.execute('select powersync_rs_version() as version');
+      // TODO: Check the version?
+      // expect(rs.rows.item(0).version).to.equal('0.2.0...');
+    });
+  });
+
   describe('Raw queries', () => {
     it('Insert', async () => {
       const res = await createTestUser();
