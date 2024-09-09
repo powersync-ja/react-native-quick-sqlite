@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 1.3.1
+
+### Patch Changes
+
+- b8e0524: Use install_modules_dependencies if available in newer react-native versions.
+
 ## 1.3.0
 
 ### Minor Changes
