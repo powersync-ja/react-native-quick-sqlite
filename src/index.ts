@@ -43,6 +43,16 @@ if (global.__QuickSQLiteProxy == null) {
 const proxy = global.__QuickSQLiteProxy;
 export const QuickSQLite = proxy as ISQLite;
 
+export const {
+  IOS_DOCUMENT_PATH,
+  IOS_LIBRARY_PATH,
+  ANDROID_DATABASE_PATH,
+  ANDROID_FILES_PATH,
+  ANDROID_EXTERNAL_FILES_PATH
+} = !!NativeModules.RNQuickSQLite.getConstants
+  ? NativeModules.RNQuickSQLite.getConstants()
+  : NativeModules.RNQuickSQLite;
+
 export const { open } = setupOpen(QuickSQLite);
 
 export const typeORMDriver = setupTypeORMDriver(open);
