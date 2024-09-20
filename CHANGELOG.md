@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 1.4.0
+
+### Minor Changes
+
+- 429361a: - Remove use of nativeCallSyncHook() for new architecture support.
+
 ## 1.3.1
 
 ### Patch Changes
