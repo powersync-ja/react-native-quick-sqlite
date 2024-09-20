@@ -10,8 +10,8 @@ const _ = require('lodash');
 const chalk = require('chalk');
 const { program } = require('commander');
 
-const DEFAULT_AVD_NAME = 'macOS-avd-x86_64-29';
-const DEFAULT_SIMULATOR_NAME = 'iPhone 11';
+const DEFAULT_AVD_NAME = 'Pixel_3a_API_34_extension_level_7_arm64-v8a';
+const DEFAULT_SIMULATOR_NAME = 'iPhone 15 Pro Max';
 const DEFAULT_PORT = 4243;
 const TEST_TIMEOUT = 1_800_000; // 30 minutes
 

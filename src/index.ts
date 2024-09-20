@@ -18,7 +18,7 @@ if (global.__QuickSQLiteProxy == null) {
   }
 
   // Check if we are running on-device (JSI)
-  if (global.nativeCallSyncHook == null || QuickSQLiteModule.install == null) {
+  if (QuickSQLiteModule.install == null) {
     throw new Error(
       'Failed to install react-native-quick-sqlite: React Native is not running on-device. QuickSQLite can only be used when synchronous method invocations (JSI) are possible. If you are using a remote debugger (e.g. Chrome), switch to an on-device debugger (e.g. Flipper) instead.'
     );
