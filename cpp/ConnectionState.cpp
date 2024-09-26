@@ -116,5 +116,7 @@ SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,
                           .errorMessage = sqlite3_errmsg(*db)};
   }
 
+  sqlite3_enable_load_extension(*db, 1);
+
   return SQLiteOPResult{.type = SQLiteOk, .rowsAffected = 0};
 }
