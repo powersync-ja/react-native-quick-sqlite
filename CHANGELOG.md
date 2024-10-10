@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 2.0.0
+
+### Major Changes
+
+- ad95915: Use powersync-sqlite-core 0.3.0
+
 ## 1.4.0
 
 ### Minor Changes
