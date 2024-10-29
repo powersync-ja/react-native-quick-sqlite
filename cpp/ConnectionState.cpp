@@ -116,5 +116,29 @@ SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,
                           .errorMessage = sqlite3_errmsg(*db)};
   }
 
+  // Set journal mode directly when opening.
+  // This may have some overhead on the main thread,
+  // but prevents race conditions with multiple connections.
+  if (sqlOpenFlags & SQLITE_OPEN_READONLY) {
+    exit = sqlite3_exec(*db, "PRAGMA busy_timeout = 30000;"
+      // Default to normal on all connections
+      "PRAGMA synchronous = NORMAL;",
+      nullptr, nullptr, nullptr
+    );
+  } else {
+    exit = sqlite3_exec(*db, "PRAGMA busy_timeout = 30000;"
+      "PRAGMA journal_mode = WAL;"
+      // 6Mb 1.5x default checkpoint size
+      "PRAGMA journal_size_limit = 6291456;"
+      // Default to normal on all connections
+      "PRAGMA synchronous = NORMAL;",
+      nullptr, nullptr, nullptr
+    );
+  }
+  if (exit != SQLITE_OK) {
+    return SQLiteOPResult{.type = SQLiteError,
+                          .errorMessage = sqlite3_errmsg(*db)};
+  }
+
   return SQLiteOPResult{.type = SQLiteOk, .rowsAffected = 0};
 }

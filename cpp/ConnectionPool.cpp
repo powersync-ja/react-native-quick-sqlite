@@ -26,26 +26,6 @@ ConnectionPool::ConnectionPool(std::string dbName, std::string docPath,
     readConnections[i] = new ConnectionState(
         dbName, docPath, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX);
   }
-
-  if (true == isConcurrencyEnabled) {
-    // Write connection WAL setup
-    writeConnection.queueWork([](sqlite3 *db) {
-      sqliteExecuteLiteralWithDB(db, "PRAGMA journal_mode = WAL;");
-      sqliteExecuteLiteralWithDB(
-          db,
-          "PRAGMA journal_size_limit = 6291456"); // 6Mb 1.5x default checkpoint
-                                                  // size
-      // Default to normal on all connections
-      sqliteExecuteLiteralWithDB(db, "PRAGMA synchronous = NORMAL;");
-    });
-
-    // Read connections WAL setup
-    for (int i = 0; i < this->maxReads; i++) {
-      readConnections[i]->queueWork([](sqlite3 *db) {
-        sqliteExecuteLiteralWithDB(db, "PRAGMA synchronous = NORMAL;");
-      });
-    }
-  }
 };
 
 ConnectionPool::~ConnectionPool() {
