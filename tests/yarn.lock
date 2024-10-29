@@ -6259,8 +6259,9 @@ react-native-quick-base64@^2.0.5:
   dependencies:
     base64-js "^1.5.1"
 
-react-native-quick-sqlite@./..:
-  version "1.1.5"
+"react-native-quick-sqlite@link:..":
+  version "0.0.0"
+  uid ""
 
 react-native-safe-area-context@4.8.2:
   version "4.8.2"

@@ -24,11 +24,13 @@ program
     'The virtual android device name (the adb device name will be fetched from this)',
     DEFAULT_AVD_NAME
   )
+  .option('--device', 'Use a physical device instead of emulator')
   .option('--port', 'Port to run Express HTTP server for getting results on.', DEFAULT_PORT)
   .action(async (str, options) => {
     const opts = options.opts();
     const avdName = opts.avdName;
-    const deviceName = await getADBDeviceName(avdName);
+    const useDevice = opts.device;
+    const deviceName = await getADBDeviceName(avdName, useDevice);
     if (!deviceName) {
       throw new Error(`Could not find adb device with AVD name ${avdName}`);
     }
@@ -38,7 +40,11 @@ program
     await spawnP('Reverse Port', `adb`, [`-s`, deviceName, `reverse`, `tcp:${port}`, `tcp:${port}`]);
 
     /** Build and run the Expo app, don't await this, we will await a response. */
-    spawnP('Build Expo App', `yarn`, [`android`, `-d`, avdName]);
+    if (!useDevice) {
+      spawnP('Build Expo App', `yarn`, [`android`, `-d`, avdName]);
+    } else {
+      spawnP('Build Expo App', `yarn`, [`android`]);
+    }
 
     const app = express();
     app.use(bodyParser.json());
@@ -107,7 +113,7 @@ async function spawnP(tag, cmd, args = []) {
   });
 }
 
-async function getADBDeviceName(avdName) {
+async function getADBDeviceName(avdName, useDevice) {
   const tag = 'Get ADB Device';
   const devicesOutput = await spawnP(tag, 'adb', ['devices']);
   const deviceNames = _.chain(devicesOutput.split('\n'))
@@ -116,7 +122,9 @@ async function getADBDeviceName(avdName) {
     .map((line) => line.trim()) // Omit empty results
     .filter((line) => !!line)
     .value();
-
+  if (useDevice) {
+    return deviceNames[0];
+  }
   // Need to check all devices for their AVD name
   for (let deviceName of deviceNames) {
     try {

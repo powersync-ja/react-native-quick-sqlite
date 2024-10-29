@@ -30,9 +30,7 @@ ConnectionState::~ConnectionState() {
 }
 
 void ConnectionState::clearLock() {
-  if (!workQueue.empty()) {
-    waitFinished();
-  }
+  waitFinished();
   _currentLockId = EMPTY_LOCK_ID;
 }
 
@@ -47,9 +45,7 @@ bool ConnectionState::matchesLock(const ConnectionLockId &lockId) {
 bool ConnectionState::isEmptyLock() { return _currentLockId == EMPTY_LOCK_ID; }
 
 void ConnectionState::close() {
-  if (!workQueue.empty()) {
-    waitFinished();
-  }
+  waitFinished();
   // So that the thread can stop (if not already)
   threadDone = true;
   sqlite3_close_v2(connection);
@@ -94,12 +90,18 @@ void ConnectionState::doWork() {
     --threadBusy;
     // Need to notify in order for waitFinished to be updated when
     // the queue is empty and not busy
-    workQueueConditionVariable.notify_all();
+    {
+      std::unique_lock<std::mutex> g(workQueueMutex);
+      workQueueConditionVariable.notify_all();
+    }
   }
 }
 
 void ConnectionState::waitFinished() {
   std::unique_lock<std::mutex> g(workQueueMutex);
+  if (workQueue.empty()) {
+    return;
+  }
   workQueueConditionVariable.wait(
       g, [&] { return workQueue.empty() && (threadBusy == 0); });
 }
@@ -111,6 +113,30 @@ SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,
   int exit = 0;
   exit = sqlite3_open_v2(dbPath.c_str(), db, sqlOpenFlags, nullptr);
 
+  if (exit != SQLITE_OK) {
+    return SQLiteOPResult{.type = SQLiteError,
+                          .errorMessage = sqlite3_errmsg(*db)};
+  }
+
+  // Set journal mode directly when opening.
+  // This may have some overhead on the main thread,
+  // but prevents race conditions with multiple connections.
+  if (sqlOpenFlags & SQLITE_OPEN_READONLY) {
+    exit = sqlite3_exec(*db, "PRAGMA busy_timeout = 30000;"
+      // Default to normal on all connections
+      "PRAGMA synchronous = NORMAL;",
+      nullptr, nullptr, nullptr
+    );
+  } else {
+    exit = sqlite3_exec(*db, "PRAGMA busy_timeout = 30000;"
+      "PRAGMA journal_mode = WAL;"
+      // 6Mb 1.5x default checkpoint size
+      "PRAGMA journal_size_limit = 6291456;"
+      // Default to normal on all connections
+      "PRAGMA synchronous = NORMAL;",
+      nullptr, nullptr, nullptr
+    );
+  }
   if (exit != SQLITE_OK) {
     return SQLiteOPResult{.type = SQLiteError,
                           .errorMessage = sqlite3_errmsg(*db)};
