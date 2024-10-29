@@ -629,5 +629,25 @@ export function registerBaseTests() {
 
       expect(duration).lessThan(2000);
     });
+
+    it('Should use WAL', async () => {
+      for (let i = 0; i < 5; i++) {
+        let db: QuickSQLiteConnection;
+        try {
+          db = open('test-wal' + i, {
+            numReadConnections: NUM_READ_CONNECTIONS
+          });
+
+          const journalMode = await db.execute('PRAGMA journal_mode');
+          const journalModeRO = await db.readLock((tx) => tx.execute('PRAGMA journal_mode'));
+          expect(journalMode.rows.item(0).journal_mode).equals('wal');
+
+          expect(journalModeRO.rows.item(0).journal_mode).equals('wal');
+        } finally {
+          db?.close();
+          db?.delete();
+        }
+      }
+    });
   });
 }
