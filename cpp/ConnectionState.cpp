@@ -92,7 +92,7 @@ void ConnectionState::doWork() {
     // the queue is empty and not busy
     {
       std::unique_lock<std::mutex> g(workQueueMutex);
-    workQueueConditionVariable.notify_all();
+      workQueueConditionVariable.notify_all();
     }
   }
 }
