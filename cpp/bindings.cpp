@@ -298,6 +298,8 @@ auto refreshSchema = HOSTFN("refreshSchema", 1) {
     string dbName = args[0].asString(rt).utf8(rt);
 
     sqliteRefreshSchema(dbName);
+
+    return {};
 });
 
   auto executeInContext = HOSTFN("executeInContext", 3) {
