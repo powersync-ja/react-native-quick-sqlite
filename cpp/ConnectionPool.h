@@ -127,6 +127,11 @@ public:
   void closeAll();
 
   /**
+   * Refreshes the schema for all connections.
+   */
+  void refreshSchema();
+
+  /**
    * Attaches another database to all connections
    */
   SQLiteOPResult attachDatabase(std::string const dbFileName,

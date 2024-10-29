@@ -124,6 +124,7 @@ export interface ISQLite {
   open: Open;
   close: (dbName: string) => void;
   delete: (dbName: string, location?: string) => void;
+  refreshSchema: (dbName: string) => void;
 
   requestLock: (dbName: string, id: ContextLockID, type: ConcurrentLockType) => QueryResult;
   releaseLock(dbName: string, id: ContextLockID): void;
@@ -151,6 +152,7 @@ export interface TransactionContext extends LockContext {
 
 export type QuickSQLiteConnection = {
   close: () => void;
+  refreshSchema: () => void;
   execute: (sql: string, args?: any[]) => Promise<QueryResult>;
   readLock: <T>(callback: (context: LockContext) => Promise<T>, options?: LockOptions) => Promise<T>;
   readTransaction: <T>(callback: (context: TransactionContext) => Promise<T>, options?: LockOptions) => Promise<T>;

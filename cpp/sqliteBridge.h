@@ -33,6 +33,8 @@ sqliteOpenDb(std::string const dbName, std::string const docPath,
                  const TransactionCallbackPayload *event),
              uint32_t numReadConnections);
 
+void sqliteRefreshSchema(string const dbName);
+
 SQLiteOPResult sqliteCloseDb(string const dbName);
 
 void sqliteCloseAll();

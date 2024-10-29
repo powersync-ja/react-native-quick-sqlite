@@ -60,6 +60,17 @@ sqliteOpenDb(string const dbName, string const docPath,
   };
 }
 
+void sqliteRefreshSchema(string const dbName) {
+  if (dbMap.count(dbName) == 0) {
+   // Do nothing 
+    return;
+  }
+
+  ConnectionPool *connection = dbMap[dbName];
+  connection->refreshSchema();
+}
+
+
 SQLiteOPResult sqliteCloseDb(string const dbName) {
   if (dbMap.count(dbName) == 0) {
     return generateNotOpenResult(dbName);

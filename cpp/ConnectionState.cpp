@@ -44,6 +44,12 @@ bool ConnectionState::matchesLock(const ConnectionLockId &lockId) {
 
 bool ConnectionState::isEmptyLock() { return _currentLockId == EMPTY_LOCK_ID; }
 
+void ConnectionState::refreshSchema() {
+  queueWork([this](sqlite3* db) {
+    sqlite3_exec(db, "PRAGMA table_info('sqlite_master')", nullptr, nullptr, nullptr);
+  });
+}
+
 void ConnectionState::close() {
   waitFinished();
   // So that the thread can stop (if not already)

@@ -168,6 +168,14 @@ void ConnectionPool::closeAll() {
   }
 }
 
+void ConnectionPool::refreshSchema() {
+  writeConnection.refreshSchema();
+
+  for (unsigned int i = 0; i < maxReads; i++) {
+    readConnections[i]->refreshSchema();
+  }
+}
+
 SQLiteOPResult ConnectionPool::attachDatabase(std::string const dbFileName,
                                               std::string const docPath,
                                               std::string const alias) {

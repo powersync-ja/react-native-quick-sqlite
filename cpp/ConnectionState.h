@@ -41,6 +41,7 @@ public:
   bool matchesLock(const ConnectionLockId &lockId);
   bool isEmptyLock();
 
+  void refreshSchema();
   void close();
   void queueWork(std::function<void(sqlite3 *)> task);
 

@@ -286,6 +286,20 @@ void osp::install(jsi::Runtime &rt,
     return {};
   });
 
+auto refreshSchema = HOSTFN("refreshSchema", 1) {
+    if (count == 0) {
+        throw jsi::JSError(rt, "[react-native-quick-sqlite][refreshSchema] database name is required");
+    }
+
+    if (!args[0].isString()) {
+        throw jsi::JSError(rt, "[react-native-quick-sqlite][refreshSchema] database name must be a string");
+    }
+
+    string dbName = args[0].asString(rt).utf8(rt);
+
+    sqliteRefreshSchema(dbName);
+});
+
   auto executeInContext = HOSTFN("executeInContext", 3) {
     if (count < 4) {
       throw jsi::JSError(rt,
@@ -500,6 +514,7 @@ void osp::install(jsi::Runtime &rt,
   module.setProperty(rt, "releaseLock", move(releaseLock));
   module.setProperty(rt, "executeInContext", move(executeInContext));
   module.setProperty(rt, "close", move(close));
+  module.setProperty(rt, "refreshSchema", move(refreshSchema));
 
   module.setProperty(rt, "attach", move(attach));
   module.setProperty(rt, "detach", move(detach));
