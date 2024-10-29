@@ -30,9 +30,7 @@ ConnectionState::~ConnectionState() {
 }
 
 void ConnectionState::clearLock() {
-  if (!workQueue.empty()) {
-    waitFinished();
-  }
+  waitFinished();
   _currentLockId = EMPTY_LOCK_ID;
 }
 
@@ -47,9 +45,7 @@ bool ConnectionState::matchesLock(const ConnectionLockId &lockId) {
 bool ConnectionState::isEmptyLock() { return _currentLockId == EMPTY_LOCK_ID; }
 
 void ConnectionState::close() {
-  if (!workQueue.empty()) {
-    waitFinished();
-  }
+  waitFinished();
   // So that the thread can stop (if not already)
   threadDone = true;
   sqlite3_close_v2(connection);
@@ -94,12 +90,18 @@ void ConnectionState::doWork() {
     --threadBusy;
     // Need to notify in order for waitFinished to be updated when
     // the queue is empty and not busy
+    {
+      std::unique_lock<std::mutex> g(workQueueMutex);
     workQueueConditionVariable.notify_all();
+    }
   }
 }
 
 void ConnectionState::waitFinished() {
   std::unique_lock<std::mutex> g(workQueueMutex);
+  if (workQueue.empty()) {
+    return;
+  }
   workQueueConditionVariable.wait(
       g, [&] { return workQueue.empty() && (threadBusy == 0); });
 }
