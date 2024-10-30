@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 2.0.1
+
+### Patch Changes
+
+- 63cc6b2: Fix issue where new databases would not always have journal_mode = WAL.
+
 ## 2.0.0
 
 ### Major Changes
