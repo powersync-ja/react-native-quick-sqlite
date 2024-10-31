@@ -2,6 +2,8 @@
 #include "fileUtils.h"
 #include "sqlite3.h"
 
+
+
 const std::string EMPTY_LOCK_ID = "";
 
 SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,
@@ -44,11 +46,25 @@ bool ConnectionState::matchesLock(const ConnectionLockId &lockId) {
 
 bool ConnectionState::isEmptyLock() { return _currentLockId == EMPTY_LOCK_ID; }
 
-void ConnectionState::refreshSchema() {
-  queueWork([this](sqlite3* db) {
-    sqlite3_exec(db, "PRAGMA table_info('sqlite_master')", nullptr, nullptr, nullptr);
-  });
+std::future<void> ConnectionState::refreshSchema() {
+    auto promise = std::make_shared<std::promise<void>>();
+    auto future = promise->get_future();
+
+    queueWork([promise](sqlite3* db) {
+        try {
+            int rc = sqlite3_exec(db, "PRAGMA table_info('sqlite_master')", nullptr, nullptr, nullptr);
+            if (rc != SQLITE_OK) {
+                throw std::runtime_error("Failed to refresh schema");
+            }
+            promise->set_value();
+        } catch (...) {
+            promise->set_exception(std::current_exception());
+        }
+    });
+
+    return future;
 }
+
 
 void ConnectionState::close() {
   waitFinished();

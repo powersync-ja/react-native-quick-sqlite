@@ -11,6 +11,7 @@
 #include "JSIHelper.h"
 #include "sqlite3.h"
 #include <vector>
+#include <future>
 
 #ifndef SQLiteBridge_h
 #define SQLiteBridge_h
@@ -33,7 +34,7 @@ sqliteOpenDb(std::string const dbName, std::string const docPath,
                  const TransactionCallbackPayload *event),
              uint32_t numReadConnections);
 
-void sqliteRefreshSchema(string const dbName);
+std::future<void> sqliteRefreshSchema(const std::string& dbName);
 
 SQLiteOPResult sqliteCloseDb(string const dbName);
 

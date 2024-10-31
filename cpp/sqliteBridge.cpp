@@ -60,14 +60,17 @@ sqliteOpenDb(string const dbName, string const docPath,
   };
 }
 
-void sqliteRefreshSchema(string const dbName) {
-  if (dbMap.count(dbName) == 0) {
-   // Do nothing 
-    return;
-  }
 
-  ConnectionPool *connection = dbMap[dbName];
-  connection->refreshSchema();
+std::future<void> sqliteRefreshSchema(const std::string& dbName) {
+    if (dbMap.count(dbName) == 0) {
+        // Database not found, return a future that's already set
+        std::promise<void> promise;
+        promise.set_value();
+        return promise.get_future();
+    }
+
+    ConnectionPool* connection = dbMap[dbName];
+    return connection->refreshSchema();
 }
 
 
