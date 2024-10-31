@@ -2,8 +2,6 @@
 #include "fileUtils.h"
 #include "sqlite3.h"
 
-
-
 const std::string EMPTY_LOCK_ID = "";
 
 SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,
@@ -64,7 +62,6 @@ std::future<void> ConnectionState::refreshSchema() {
 
     return future;
 }
-
 
 void ConnectionState::close() {
   waitFinished();

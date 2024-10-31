@@ -130,7 +130,7 @@ public:
   /**
    * Refreshes the schema for all connections.
    */
-  std::future<void> ConnectionPool::refreshSchema();
+  std::future<void> refreshSchema();
 
   /**
    * Attaches another database to all connections

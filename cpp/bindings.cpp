@@ -286,7 +286,6 @@ void osp::install(jsi::Runtime &rt,
     return {};
   });
 
-  
   auto refreshSchema = HOSTFN("refreshSchema", 1) {
     if (count == 0) {
         throw jsi::JSError(rt, "[react-native-quick-sqlite][refreshSchema] database name is required");
@@ -323,9 +322,7 @@ void osp::install(jsi::Runtime &rt,
             }).detach();
 
         } catch (const std::exception& exc) {
-            auto errorCtr = rt.global().getPropertyAsFunction(rt, "Error");
-            auto error = errorCtr.callAsConstructor(rt, jsi::String::createFromUtf8(rt, exc.what()));
-            reject->asObject(rt).asFunction(rt).call(rt, error);
+            invoker->invokeAsync([&rt, &exc] { jsi::JSError(rt, exc.what()); });
         }
 
         return {};
