@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 2.1.0
+
+### Minor Changes
+
+- 23bcb1d: Added `refreshSchema()` to bindings. Will cause all connections to be aware of a schema change.
+
 ## 2.0.1
 
 ### Patch Changes
