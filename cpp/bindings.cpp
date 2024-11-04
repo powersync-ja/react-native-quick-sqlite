@@ -286,6 +286,51 @@ void osp::install(jsi::Runtime &rt,
     return {};
   });
 
+  auto refreshSchema = HOSTFN("refreshSchema", 1) {
+    if (count == 0) {
+        throw jsi::JSError(rt, "[react-native-quick-sqlite][refreshSchema] database name is required");
+    }
+
+    if (!args[0].isString()) {
+        throw jsi::JSError(rt, "[react-native-quick-sqlite][refreshSchema] database name must be a string");
+    }
+
+    std::string dbName = args[0].asString(rt).utf8(rt);
+
+    auto promiseCtr = rt.global().getPropertyAsFunction(rt, "Promise");
+    auto jsPromise = promiseCtr.callAsConstructor(rt, HOSTFN("executor", 2) {
+        auto resolve = std::make_shared<jsi::Value>(rt, args[0]);
+        auto reject = std::make_shared<jsi::Value>(rt, args[1]);
+
+        try {
+            auto future = sqliteRefreshSchema(dbName);
+
+            // Waiting for the future to complete in a separate thread
+            std::thread([future = std::move(future), &rt, resolve, reject]() mutable {
+                try {
+                    future.get(); 
+                    invoker->invokeAsync([&rt, resolve] {
+                        resolve->asObject(rt).asFunction(rt).call(rt);
+                    });
+                } catch (const std::exception& exc) {
+                    invoker->invokeAsync([&rt, reject, exc] {
+                        auto errorCtr = rt.global().getPropertyAsFunction(rt, "Error");
+                        auto error = errorCtr.callAsConstructor(rt, jsi::String::createFromUtf8(rt, exc.what()));
+                        reject->asObject(rt).asFunction(rt).call(rt, error);
+                    });
+                }
+            }).detach();
+
+        } catch (const std::exception& exc) {
+            invoker->invokeAsync([&rt, &exc] { jsi::JSError(rt, exc.what()); });
+        }
+
+        return {};
+    }));
+
+    return jsPromise;
+  });
+
   auto executeInContext = HOSTFN("executeInContext", 3) {
     if (count < 4) {
       throw jsi::JSError(rt,
@@ -500,6 +545,7 @@ void osp::install(jsi::Runtime &rt,
   module.setProperty(rt, "releaseLock", move(releaseLock));
   module.setProperty(rt, "executeInContext", move(executeInContext));
   module.setProperty(rt, "close", move(close));
+  module.setProperty(rt, "refreshSchema", move(refreshSchema));
 
   module.setProperty(rt, "attach", move(attach));
   module.setProperty(rt, "detach", move(detach));

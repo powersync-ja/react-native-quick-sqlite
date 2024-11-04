@@ -168,6 +168,22 @@ void ConnectionPool::closeAll() {
   }
 }
 
+std::future<void> ConnectionPool::refreshSchema() {
+    std::vector<std::future<void>> futures;
+
+    futures.push_back(writeConnection.refreshSchema());
+
+    for (unsigned int i = 0; i < maxReads; i++) {
+        futures.push_back(readConnections[i]->refreshSchema());
+    }
+
+    return std::async(std::launch::async, [futures = std::move(futures)]() mutable {
+        for (auto& future : futures) {
+            future.get(); 
+        }
+    });
+}
+
 SQLiteOPResult ConnectionPool::attachDatabase(std::string const dbFileName,
                                               std::string const docPath,
                                               std::string const alias) {

@@ -225,6 +225,7 @@ export function setupOpen(QuickSQLite: ISQLite) {
       // Return the concurrent connection object
       return {
         close: () => QuickSQLite.close(dbName),
+        refreshSchema: () => QuickSQLite.refreshSchema(dbName),
         execute: (sql: string, args?: any[]) => writeLock((context) => context.execute(sql, args)),
         readLock,
         readTransaction: async <T>(callback: (context: TransactionContext) => Promise<T>, options?: LockOptions) =>

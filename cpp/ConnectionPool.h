@@ -3,6 +3,7 @@
 #include "sqlite3.h"
 #include <string>
 #include <vector>
+#include <future>
 
 #ifndef ConnectionPool_h
 #define ConnectionPool_h
@@ -125,6 +126,11 @@ public:
    * Close all connections.
    */
   void closeAll();
+
+  /**
+   * Refreshes the schema for all connections.
+   */
+  std::future<void> refreshSchema();
 
   /**
    * Attaches another database to all connections

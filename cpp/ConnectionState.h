@@ -6,6 +6,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <future>
 
 #ifndef ConnectionState_h
 #define ConnectionState_h
@@ -41,6 +42,7 @@ public:
   bool matchesLock(const ConnectionLockId &lockId);
   bool isEmptyLock();
 
+  std::future<void> refreshSchema();
   void close();
   void queueWork(std::function<void(sqlite3 *)> task);
 
