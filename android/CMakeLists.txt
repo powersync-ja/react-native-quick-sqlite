@@ -50,23 +50,32 @@ set_target_properties(
 find_package(ReactAndroid REQUIRED CONFIG)
 find_package(fbjni REQUIRED CONFIG)
 find_package(powersync_sqlite_core REQUIRED CONFIG)
+
 find_library(LOG_LIB log)
-
-if(${USE_HERMES})
-  set(JSEXECUTOR_LIB ReactAndroid::hermes_executor)
-else()
-  set(JSEXECUTOR_LIB ReactAndroid::jscexecutor)
-endif()
-
 
 target_link_libraries(
   ${PACKAGE_NAME}
   ${LOG_LIB}
   fbjni::fbjni
   ReactAndroid::jsi
-  ReactAndroid::turbomodulejsijni
-  ReactAndroid::react_nativemodule_core
-  ${JSEXECUTOR_LIB}
   android
   powersync_sqlite_core::powersync
 )
+
+if(REACTNATIVE_MERGED_SO OR ReactAndroid_VERSION_MINOR GREATER_EQUAL 76)
+  target_link_libraries(
+    ReactAndroid::reactnative
+  )
+else()
+  if(${USE_HERMES})
+    set(JSEXECUTOR_LIB ReactAndroid::hermes_executor)
+  else()
+    set(JSEXECUTOR_LIB ReactAndroid::jscexecutor)
+  endif()
+
+  target_link_libraries(
+    ReactAndroid::turbomodulejsijni
+    ReactAndroid::react_nativemodule_core
+    ${JSEXECUTOR_LIB}
+  )
+endif()
