@@ -81,5 +81,6 @@ else()
     ${PACKAGE_NAME}
     ReactAndroid::turbomodulejsijni
     ReactAndroid::react_nativemodule_core
+    ${JSEXECUTOR_LIB}
   )
 endif()
