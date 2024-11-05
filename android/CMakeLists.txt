@@ -62,8 +62,12 @@ target_link_libraries(
   powersync_sqlite_core::powersync
 )
 
+# This if-then-else can be removed once this library does not support react-native versions below 0.76
+# Ideally we would just depend on `REACTNATIVE_MERGED_SO`
+# See https://github.com/react-native-community/discussions-and-proposals/discussions/816
 if(REACTNATIVE_MERGED_SO OR ReactAndroid_VERSION_MINOR GREATER_EQUAL 76)
   target_link_libraries(
+    ${PACKAGE_NAME}
     ReactAndroid::reactnative
   )
 else()
@@ -74,8 +78,8 @@ else()
   endif()
 
   target_link_libraries(
+    ${PACKAGE_NAME}
     ReactAndroid::turbomodulejsijni
     ReactAndroid::react_nativemodule_core
-    ${JSEXECUTOR_LIB}
   )
 endif()

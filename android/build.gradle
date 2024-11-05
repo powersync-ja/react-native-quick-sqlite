@@ -92,7 +92,9 @@ android {
               "**/libjsi.so",
               "**/libreact_nativemodule_core.so",
               "**/libturbomodulejsijni.so",
-              "**/libreactnative.so"
+              "**/libreactnative.so",
+              "**/libc++_shared.so",
+              "**/libfbjni.so"
       ]
     }
     
