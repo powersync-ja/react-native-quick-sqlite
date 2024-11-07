@@ -153,7 +153,7 @@ jsi::Value createSequelQueryExecutionResult(jsi::Runtime &rt, SQLiteOPResult sta
       // Iterate over metadata to maintain column order
       for (const auto &column : *metadata)
       {
-        std::string columnName = column.colunmName;
+        std::string columnName = column.columnName;
         auto it = row.find(columnName);
         if (it != row.end())
         {
@@ -198,7 +198,7 @@ jsi::Value createSequelQueryExecutionResult(jsi::Runtime &rt, SQLiteOPResult sta
     for (int i = 0; i < column_count; i++) {
       auto column = metadata->at(i);
       jsi::Object column_object = jsi::Object(rt);
-      column_object.setProperty(rt, "columnName", jsi::String::createFromUtf8(rt, column.colunmName.c_str()));
+      column_object.setProperty(rt, "columnName", jsi::String::createFromUtf8(rt, column.columnName.c_str()));
       column_object.setProperty(rt, "columnDeclaredType", jsi::String::createFromUtf8(rt, column.columnDeclaredType.c_str()));
       column_object.setProperty(rt, "columnIndex", jsi::Value(column.columnIndex));
       column_array.setValueAtIndex(rt, i, move(column_object));
