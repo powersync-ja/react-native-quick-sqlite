@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 2.1.2
+
+### Patch Changes
+
+- a6e21ed: Use powersync-sqlite-core 0.3.6 to fix issue with dangling rows.
+
 ## 2.1.1
 
 ### Patch Changes
