@@ -1,5 +1,17 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 2.1.2
+
+### Patch Changes
+
+- a6e21ed: Use powersync-sqlite-core 0.3.6 to fix issue with dangling rows.
+
+## 2.1.1
+
+### Patch Changes
+
+- 9ac4ce7: Result object keys are no longer ordered alphabetically, but rather maintain insertion order. The behaviour now matches other libraries.
+
 ## 2.1.0
 
 ### Minor Changes

@@ -143,40 +143,44 @@ jsi::Value createSequelQueryExecutionResult(jsi::Runtime &rt, SQLiteOPResult sta
   // Converting row results into objects
   size_t rowCount = results->size();
   jsi::Object rows = jsi::Object(rt);
-  if (rowCount > 0)
+  if (rowCount > 0 && metadata != NULL)
   {
     auto array = jsi::Array(rt, rowCount);
     for (int i = 0; i < rowCount; i++)
     {
       jsi::Object rowObject = jsi::Object(rt);
-      auto row = results->at(i);
-      for (auto const &entry : row)
+      auto row = results -> at(i);
+      // Iterate over metadata to maintain column order
+      for (const auto &column : *metadata)
       {
-        std::string columnName = entry.first;
-        QuickValue value = entry.second;
-        if (value.dataType == TEXT)
+        std::string columnName = column.columnName;
+        auto it = row.find(columnName);
+        if (it != row.end())
         {
-          // using value.textValue (std::string) directly allows jsi::String to use length property of std::string (allowing strings with NULLs in them like SQLite does)
-          rowObject.setProperty(rt, columnName.c_str(), jsi::String::createFromUtf8(rt, value.textValue));
-        }
-        else if (value.dataType == INTEGER)
-        {
-          rowObject.setProperty(rt, columnName.c_str(), jsi::Value(value.doubleOrIntValue));
-        }
-        else if (value.dataType == DOUBLE)
-        {
-          rowObject.setProperty(rt, columnName.c_str(), jsi::Value(value.doubleOrIntValue));
-        }
-        else if (value.dataType == ARRAY_BUFFER)
-        {
-          jsi::Function array_buffer_ctor = rt.global().getPropertyAsFunction(rt, "ArrayBuffer");
-          jsi::Object o = array_buffer_ctor.callAsConstructor(rt, (int)value.arrayBufferSize).getObject(rt);
-          jsi::ArrayBuffer buf = o.getArrayBuffer(rt);
-          // It's a shame we have to copy here: see https://github.com/facebook/hermes/pull/419 and https://github.com/facebook/hermes/issues/564.
-          memcpy(buf.data(rt), value.arrayBufferValue.get(), value.arrayBufferSize);
-          rowObject.setProperty(rt, columnName.c_str(), o);
-        }
-        else
+          QuickValue value = it -> second;
+          if (value.dataType == TEXT)
+          {
+            // using value.textValue (std::string) directly allows jsi::String to use length property of std::string (allowing strings with NULLs in them like SQLite does)
+            rowObject.setProperty(rt, columnName.c_str(), jsi::String::createFromUtf8(rt, value.textValue));
+          } else if (value.dataType == INTEGER)
+          {
+            rowObject.setProperty(rt, columnName.c_str(), jsi::Value(value.doubleOrIntValue));
+          } else if (value.dataType == DOUBLE)
+          {
+            rowObject.setProperty(rt, columnName.c_str(), jsi::Value(value.doubleOrIntValue));
+          } else if (value.dataType == ARRAY_BUFFER)
+          {
+            jsi::Function array_buffer_ctor = rt.global().getPropertyAsFunction(rt, "ArrayBuffer");
+            jsi::Object o = array_buffer_ctor.callAsConstructor(rt, (int) value.arrayBufferSize).getObject(rt);
+            jsi::ArrayBuffer buf = o.getArrayBuffer(rt);
+            // It's a shame we have to copy here: see https://github.com/facebook/hermes/pull/419 and https://github.com/facebook/hermes/issues/564.
+            memcpy(buf.data(rt), value.arrayBufferValue.get(), value.arrayBufferSize);
+            rowObject.setProperty(rt, columnName.c_str(), o);
+          } else
+          {
+            rowObject.setProperty(rt, columnName.c_str(), jsi::Value(nullptr));
+          }
+        } else
         {
           rowObject.setProperty(rt, columnName.c_str(), jsi::Value(nullptr));
         }
@@ -194,7 +198,7 @@ jsi::Value createSequelQueryExecutionResult(jsi::Runtime &rt, SQLiteOPResult sta
     for (int i = 0; i < column_count; i++) {
       auto column = metadata->at(i);
       jsi::Object column_object = jsi::Object(rt);
-      column_object.setProperty(rt, "columnName", jsi::String::createFromUtf8(rt, column.colunmName.c_str()));
+      column_object.setProperty(rt, "columnName", jsi::String::createFromUtf8(rt, column.columnName.c_str()));
       column_object.setProperty(rt, "columnDeclaredType", jsi::String::createFromUtf8(rt, column.columnDeclaredType.c_str()));
       column_object.setProperty(rt, "columnIndex", jsi::Value(column.columnIndex));
       column_array.setValueAtIndex(rt, i, move(column_object));

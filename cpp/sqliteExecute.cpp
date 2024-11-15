@@ -139,7 +139,7 @@ sqliteExecuteWithDB(sqlite3 *db, std::string const &query,
           const char *tp = sqlite3_column_decltype(statement, i);
           column_declared_type = tp != NULL ? tp : "UNKNOWN";
           QuickColumnMetadata meta = {
-              .colunmName = column_name,
+              .columnName = column_name,
               .columnIndex = i,
               .columnDeclaredType = column_declared_type,
           };

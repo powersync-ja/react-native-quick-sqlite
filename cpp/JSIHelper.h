@@ -91,7 +91,7 @@ struct SequelBatchOperationResult
  */
 struct QuickColumnMetadata
 {
-  string colunmName;
+  string columnName;
   int columnIndex;
   string columnDeclaredType;
 };
