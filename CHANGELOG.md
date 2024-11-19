@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 2.2.0
+
+### Minor Changes
+
+- cbe61de: Upgrade minSdkVersion to 24 for Expo 52
+
 ## 2.1.2
 
 ### Patch Changes
