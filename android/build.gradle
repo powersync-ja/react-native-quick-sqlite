@@ -47,6 +47,7 @@ repositories {
 
 android {
   
+  namespace "com.reactnativequicksqlite"
   compileSdkVersion safeExtGet("compileSdkVersion", 28)
   
   // Used to override the NDK path/version on internal CI or by allowing
@@ -67,7 +68,7 @@ android {
   }
 
   defaultConfig {
-    minSdkVersion 23 
+    minSdkVersion 24
     targetSdkVersion safeExtGet('targetSdkVersion', 28)
     versionCode 1
     versionName "1.0"
@@ -90,7 +91,10 @@ android {
               "META-INF/**",
               "**/libjsi.so",
               "**/libreact_nativemodule_core.so",
-              "**/libturbomodulejsijni.so"
+              "**/libturbomodulejsijni.so",
+              "**/libreactnative.so",
+              "**/libc++_shared.so",
+              "**/libfbjni.so"
       ]
     }
     
