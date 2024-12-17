@@ -12,6 +12,7 @@ include_directories(
 
 add_definitions(
   -DSQLITE_TEMP_STORE=2
+  -DSQLITE_ENABLE_FTS5=1
   ${SQLITE_FLAGS}
 )
 

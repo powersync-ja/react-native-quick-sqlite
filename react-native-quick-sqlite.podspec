@@ -18,7 +18,7 @@ Pod::Spec.new do |s|
   s.source       = { :git => "https://github.com/margelo/react-native-quick-sqlite.git", :tag => "#{s.version}" }
 
   s.pod_target_xcconfig = {
-    :GCC_PREPROCESSOR_DEFINITIONS => "HAVE_FULLFSYNC=1",
+    :GCC_PREPROCESSOR_DEFINITIONS => "HAVE_FULLFSYNC=1 SQLITE_ENABLE_FTS5=1",
     :WARNING_CFLAGS => "-Wno-shorten-64-to-32 -Wno-comma -Wno-unreachable-code -Wno-conditional-uninitialized -Wno-deprecated-declarations",
     :USE_HEADERMAP => "No"
   }
