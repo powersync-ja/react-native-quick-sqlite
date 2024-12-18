@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 2.2.1
+
+### Patch Changes
+
+- 761d441: Enable FTS5
+
 ## 2.2.0
 
 ### Minor Changes
