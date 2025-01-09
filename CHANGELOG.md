@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 2.3.0
+
+### Minor Changes
+
+- 73a0a68: powersync-sqlite-core 0.3.8: Increase column limit to 1999; improved handling of migrations on views.
+
 ## 2.2.1
 
 ### Patch Changes
