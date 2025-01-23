@@ -729,5 +729,35 @@ export function registerBaseTests() {
         expect(results.map((r) => r.rows?.length)).deep.equal(Array(promises.length).fill(50000));
       }
     });
+
+    it('Should close correctly with transaction hooks', async () => {
+      const dbName = 'test-transaction-close';
+
+      // populate test data
+      const db = open(dbName);
+      await db.execute('CREATE TABLE IF NOT EXISTS t1(id INTEGER PRIMARY KEY, c TEXT)');
+      await db.execute('DELETE FROM t1');
+      db.close();
+
+      for (let i = 1; i < 10; i++) {
+        const db = open(dbName, {
+          numReadConnections: NUM_READ_CONNECTIONS
+        });
+
+        await db.execute('DELETE FROM t1');
+
+        // ensure a regular query
+        await db.writeTransaction(async (tx) => {
+          await tx.execute('INSERT INTO t1(id, c) VALUES(?, ?)', [1, `value${i + 1}`]);
+          // Don't await these
+          for (let i = 0; i < 100; i++) {
+            tx.execute('INSERT INTO t1(id, c) VALUES(?, ?)', [i + 2, `value${i + 1}`]);
+          }
+        });
+
+        // This should not crash
+        db.close();
+      }
+    });
   });
 }
