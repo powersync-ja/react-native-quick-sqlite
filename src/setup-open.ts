@@ -1,20 +1,20 @@
 import {
-  ISQLite,
   ConcurrentLockType,
-  QuickSQLiteConnection,
   ContextLockID,
+  ISQLite,
   LockContext,
   LockOptions,
-  TransactionContext,
-  UpdateCallback,
-  SQLBatchTuple,
   OpenOptions,
-  QueryResult
+  QueryResult,
+  QuickSQLiteConnection,
+  SQLBatchTuple,
+  TransactionContext,
+  UpdateCallback
 } from './types';
 
-import { enhanceQueryResult } from './utils';
 import { DBListenerManagerInternal } from './DBListenerManager';
 import { LockHooks } from './lock-hooks';
+import { enhanceQueryResult } from './utils';
 
 type LockCallbackRecord = {
   callback: (context: LockContext) => Promise<any>;
@@ -40,10 +40,15 @@ const LockCallbacks: Record<ContextLockID, LockCallbackRecord> = {};
 let proxy: ISQLite;
 
 /**
+ * Creates a unique identifier for all a database's lock requests
+ */
+const lockKey = (dbName: string, id: ContextLockID) => `${dbName}:${id}`;
+
+/**
  * Closes the context in JS and C++
  */
 function closeContextLock(dbName: string, id: ContextLockID) {
-  delete LockCallbacks[id];
+  delete LockCallbacks[lockKey(dbName, id)];
 
   // This is configured by the setupOpen function
   proxy.releaseLock(dbName, id);
@@ -59,7 +64,11 @@ global.onLockContextIsAvailable = async (dbName: string, lockId: ContextLockID) 
   // Don't hold C++ bridge side up waiting to complete
   setImmediate(async () => {
     try {
-      const record = LockCallbacks[lockId];
+      const key = lockKey(dbName, lockId);
+      const record = LockCallbacks[key];
+      // clear record after fetching, the hash should only contain pending requests
+      delete LockCallbacks[key];
+
       if (record?.timeout) {
         clearTimeout(record.timeout);
       }
@@ -116,12 +125,12 @@ export function setupOpen(QuickSQLite: ISQLite) {
         // Wrap the callback in a promise that will resolve to the callback result
         return new Promise<T>((resolve, reject) => {
           // Add callback to the queue for timing
-          const record = (LockCallbacks[id] = {
+          const key = lockKey(dbName, id);
+          const record = (LockCallbacks[key] = {
             callback: async (context: LockContext) => {
               try {
                 await hooks?.lockAcquired?.();
                 const res = await callback(context);
-
                 closeContextLock(dbName, id);
                 resolve(res);
               } catch (ex) {
@@ -134,18 +143,19 @@ export function setupOpen(QuickSQLite: ISQLite) {
           } as LockCallbackRecord);
 
           try {
+            // throws if lock could not be requested
             QuickSQLite.requestLock(dbName, id, type);
             const timeout = options?.timeoutMs;
             if (timeout) {
               record.timeout = setTimeout(() => {
                 // The callback won't be executed
-                delete LockCallbacks[id];
+                delete LockCallbacks[key];
                 reject(new Error(`Lock request timed out after ${timeout}ms`));
               }, timeout);
             }
           } catch (ex) {
             // Remove callback from the queue
-            delete LockCallbacks[id];
+            delete LockCallbacks[key];
             reject(ex);
           }
         });
@@ -224,7 +234,26 @@ export function setupOpen(QuickSQLite: ISQLite) {
 
       // Return the concurrent connection object
       return {
-        close: () => QuickSQLite.close(dbName),
+        close: () => {
+          QuickSQLite.close(dbName);
+          // Reject any pending lock requests
+          Object.entries(LockCallbacks).forEach(([key, record]) => {
+            const recordDBName = key.split(':')[0];
+            if (dbName !== recordDBName) {
+              return;
+            }
+            // A bit of a hack, let the callbacks run with an execute method that will fail
+            record
+              .callback({
+                execute: async () => {
+                  throw new Error('Connection is closed');
+                }
+              })
+              .catch(() => {});
+
+            delete LockCallbacks[key];
+          });
+        },
         refreshSchema: () => QuickSQLite.refreshSchema(dbName),
         execute: (sql: string, args?: any[]) => writeLock((context) => context.execute(sql, args)),
         readLock,

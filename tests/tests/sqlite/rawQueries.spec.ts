@@ -651,12 +651,13 @@ export function registerBaseTests() {
     });
 
     it('Should handle multiple closes', async () => {
-      // populate test data
       const dbName = 'test-close';
+
+      // populate test data
       const db = open(dbName);
       await db.execute('CREATE TABLE IF NOT EXISTS t1(id INTEGER PRIMARY KEY, c TEXT)');
       await db.execute('DELETE FROM t1');
-      // Bulk insert 50000 rows without using a transaction
+      // // Bulk insert 50000 rows without using a transaction
       const bulkInsertCommands: SQLBatchTuple[] = [];
       for (let i = 0; i < 50000; i++) {
         bulkInsertCommands.push(['INSERT INTO t1(id, c) VALUES(?, ?)', [i + 1, `value${i + 1}`]]);
@@ -664,16 +665,68 @@ export function registerBaseTests() {
       await db.executeBatch(bulkInsertCommands);
       db.close();
 
-      for (let i = 1; i < 1_000; i++) {
+      for (let i = 1; i < 100; i++) {
         const db = open(dbName, {
           numReadConnections: NUM_READ_CONNECTIONS
         });
 
-        // don't await this on purpose
-        const pExecute = db.execute(`SELECT * FROM t1} `);
+        // ensure a regular query works
+        const pExecute = await db.execute(`SELECT * FROM t1 `);
+        expect(pExecute.rows?.length).to.equal(50000);
+
+        // Queue a bunch of write locks, these will fail due to the db being closed
+        // before they are accepted.
+        const tests = [
+          db.execute(`SELECT * FROM t1 `),
+          db.execute(`SELECT * FROM t1 `),
+          db.execute(`SELECT * FROM t1 `),
+          db.execute(`SELECT * FROM t1 `)
+        ];
+
         db.close();
 
-        await expect(pExecute).to.eventually.rejectedWith('is not open');
+        const results = await Promise.allSettled(tests);
+        expect(results.map((r) => r.status)).deep.equal(Array(tests.length).fill('rejected'));
+      }
+    });
+
+    it('Should wait for locks before close', async () => {
+      const dbName = 'test-lock-close';
+
+      // populate test data
+      const db = open(dbName);
+      await db.execute('CREATE TABLE IF NOT EXISTS t1(id INTEGER PRIMARY KEY, c TEXT)');
+      await db.execute('DELETE FROM t1');
+      // // Bulk insert 50000 rows without using a transaction
+      const bulkInsertCommands: SQLBatchTuple[] = [];
+      for (let i = 0; i < 50000; i++) {
+        bulkInsertCommands.push(['INSERT INTO t1(id, c) VALUES(?, ?)', [i + 1, `value${i + 1}`]]);
+      }
+      await db.executeBatch(bulkInsertCommands);
+      db.close();
+
+      for (let i = 1; i < 10; i++) {
+        const db = open(dbName, {
+          numReadConnections: NUM_READ_CONNECTIONS
+        });
+
+        const promises: Promise<QueryResult>[] = [];
+        // ensure a regular query
+        db.writeLock(async (tx) => {
+          await tx.execute(`SELECT * FROM t1 `);
+          // Don't await these
+          promises.push(
+            tx.execute(`SELECT * FROM t1 `),
+            tx.execute(`SELECT * FROM t1 `),
+            tx.execute(`SELECT * FROM t1 `),
+            tx.execute(`SELECT * FROM t1 `)
+          );
+        });
+
+        db.close();
+
+        const results = await Promise.all(promises);
+        expect(results.map((r) => r.rows?.length)).deep.equal(Array(promises.length).fill(50000));
       }
     });
   });

@@ -58,15 +58,19 @@ std::future<void> ConnectionState::refreshSchema() {
 }
 
 void ConnectionState::close() {
-  // prevent any new work from being queued 
-  isClosed = true;
+  {
+    // Now signal the thread to stop and notify it
+    std::unique_lock<std::mutex> g(workQueueMutex);
+    // prevent any new work from being queued 
+    isClosed = true;
+  }
 
   // Wait for the work queue to empty
   waitFinished();
 
   {
     // Now signal the thread to stop and notify it
-    std::lock_guard<std::mutex> g(workQueueMutex);
+    std::unique_lock<std::mutex> g(workQueueMutex);
     threadDone = true;
     workQueueConditionVariable.notify_all();
   }
@@ -81,12 +85,11 @@ void ConnectionState::close() {
 }
 
 void ConnectionState::queueWork(std::function<void(sqlite3 *)> task) {
-  if (isClosed) {
-    throw std::runtime_error("Connection is not open. Connection has been closed before queueing work.");
-  }
-
   {
-    std::lock_guard<std::mutex> g(workQueueMutex);
+    std::unique_lock<std::mutex> g(workQueueMutex);
+    if (isClosed) {
+      throw std::runtime_error("Connection is not open. Connection has been closed before queueing work.");
+    }
     workQueue.push(task);
   }
 

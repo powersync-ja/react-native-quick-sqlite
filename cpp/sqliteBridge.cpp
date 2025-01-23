@@ -134,13 +134,6 @@ SQLiteOPResult sqliteRequestLock(std::string const dbName,
 
   ConnectionPool *connection = dbMap[dbName];
 
-  if (connection == nullptr) {
-    return SQLiteOPResult{
-        .type = SQLiteOk,
-
-    };
-  }
-
   switch (lockType) {
   case ConcurrentLockType::ReadLock:
     connection->readLock(contextId);
@@ -155,6 +148,7 @@ SQLiteOPResult sqliteRequestLock(std::string const dbName,
 
   return SQLiteOPResult{
       .type = SQLiteOk,
+      
   };
 }
 
