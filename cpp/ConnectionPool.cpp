@@ -94,7 +94,14 @@ ConnectionPool::queueInContext(ConnectionLockId contextId,
     };
   }
 
-  state->queueWork(task);
+  try {
+    state->queueWork(task);
+  } catch (const std::exception &e) {
+    return SQLiteOPResult{
+        .errorMessage = e.what(),
+        .type = SQLiteError,
+    };
+  }
 
   return SQLiteOPResult{
       .type = SQLiteOk,

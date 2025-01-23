@@ -10,6 +10,7 @@ SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,
 ConnectionState::ConnectionState(const std::string dbName,
                                  const std::string docPath, int SQLFlags) {
   auto result = genericSqliteOpenDb(dbName, docPath, &connection, SQLFlags);
+  isClosed = false;
 
   this->clearLock();
   threadDone = false;
@@ -64,6 +65,7 @@ std::future<void> ConnectionState::refreshSchema() {
 }
 
 void ConnectionState::close() {
+  isClosed = true;
   waitFinished();
   // So that the thread can stop (if not already)
   threadDone = true;
@@ -71,6 +73,10 @@ void ConnectionState::close() {
 }
 
 void ConnectionState::queueWork(std::function<void(sqlite3 *)> task) {
+  if (isClosed) {
+    throw std::runtime_error("Connection is not open. Connection has been closed before queueing work.");
+  }
+
   // Grab the mutex
   std::lock_guard<std::mutex> g(workQueueMutex);
 
@@ -104,9 +110,9 @@ void ConnectionState::doWork() {
       workQueue.pop();
     }
 
-    ++threadBusy;
+    threadBusy = true;
     task(connection);
-    --threadBusy;
+    threadBusy = false;
     // Need to notify in order for waitFinished to be updated when
     // the queue is empty and not busy
     {
@@ -122,7 +128,7 @@ void ConnectionState::waitFinished() {
     return;
   }
   workQueueConditionVariable.wait(
-      g, [&] { return workQueue.empty() && (threadBusy == 0); });
+      g, [&] { return workQueue.empty() && (threadBusy == false); });
 }
 
 SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,

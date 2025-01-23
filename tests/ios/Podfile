@@ -12,6 +12,7 @@ install! 'cocoapods',
   :deterministic_uuids => false
 
 prepare_react_native_project!
+use_modular_headers!
 
 target 'tests' do
   use_expo_modules!

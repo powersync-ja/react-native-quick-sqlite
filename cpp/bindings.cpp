@@ -384,7 +384,14 @@ void osp::install(jsi::Runtime &rt,
         }
       };
 
-      sqliteQueueInContext(dbName, contextLockId, task);
+      auto response = sqliteQueueInContext(dbName, contextLockId, task);
+      if (response.type == SQLiteError) {
+        auto errorCtr = rt.global().getPropertyAsFunction(rt, "Error");
+        auto error = errorCtr.callAsConstructor(
+                      rt, jsi::String::createFromUtf8(
+                      rt, response.errorMessage));
+        reject->asObject(rt).asFunction(rt).call(rt, error);
+      }
       return {};
     }));
 

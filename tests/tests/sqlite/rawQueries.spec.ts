@@ -1,3 +1,5 @@
+import { expect, use } from 'chai';
+import chaiAsPromised from 'chai-as-promised';
 import Chance from 'chance';
 import {
   BatchedUpdateNotification,
@@ -10,11 +12,10 @@ import {
   UpdateNotification
 } from 'react-native-quick-sqlite';
 import { beforeEach, describe, it } from '../mocha/MochaRNAdapter';
-import chai from 'chai';
-import { randomIntFromInterval, numberName } from './utils';
+import { numberName, randomIntFromInterval } from './utils';
 
-const { expect } = chai;
 const chance = new Chance();
+use(chaiAsPromised);
 
 // Need to store the db on the global state since this variable will be cleared on hot reload,
 // Attempting to open an already open DB results in an error.
@@ -647,6 +648,33 @@ export function registerBaseTests() {
           db?.close();
           db?.delete();
         }
+      }
+    });
+
+    it('Should handle multiple closes', async () => {
+      // populate test data
+      const dbName = 'test-close';
+      const db = open(dbName);
+      await db.execute('CREATE TABLE IF NOT EXISTS t1(id INTEGER PRIMARY KEY, c TEXT)');
+      await db.execute('DELETE FROM t1');
+      // Bulk insert 50000 rows without using a transaction
+      const bulkInsertCommands: SQLBatchTuple[] = [];
+      for (let i = 0; i < 50000; i++) {
+        bulkInsertCommands.push(['INSERT INTO t1(id, c) VALUES(?, ?)', [i + 1, `value${i + 1}`]]);
+      }
+      await db.executeBatch(bulkInsertCommands);
+      db.close();
+
+      for (let i = 1; i < 1_000; i++) {
+        const db = open(dbName, {
+          numReadConnections: NUM_READ_CONNECTIONS
+        });
+
+        // don't await this on purpose
+        const pExecute = db.execute(`SELECT * FROM t1} `);
+        db.close();
+
+        await expect(pExecute).to.eventually.rejectedWith('is not open');
       }
     });
   });

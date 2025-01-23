@@ -29,10 +29,12 @@ private:
   // This condition variable is used for the threads to wait until there is work
   // to do
   std::condition_variable_any workQueueConditionVariable;
-  unsigned int threadBusy;
+  bool threadBusy;
   bool threadDone;
 
 public:
+  bool isClosed;
+
   ConnectionState(const std::string dbName, const std::string docPath,
                   int SQLFlags);
   ~ConnectionState();
