@@ -66,8 +66,8 @@ private:
   std::vector<ConnectionLockId> writeQueue;
 
   // Cached constant payloads for c style commit/rollback callbacks
-  const TransactionCallbackPayload commitPayload;
-  const TransactionCallbackPayload rollbackPayload;
+  TransactionCallbackPayload commitPayload;
+  TransactionCallbackPayload rollbackPayload;
 
   void (*onContextCallback)(std::string, ConnectionLockId);
   void (*onCommitCallback)(const TransactionCallbackPayload *);

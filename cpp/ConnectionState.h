@@ -25,15 +25,15 @@ private:
   // Mutex to protect workQueue
   std::mutex workQueueMutex;
   // Store thread in order to stop it gracefully
-  std::thread *thread;
+  std::thread thread;
   // This condition variable is used for the threads to wait until there is work
   // to do
   std::condition_variable_any workQueueConditionVariable;
-  bool threadBusy;
-  bool threadDone;
+  std::atomic<bool> threadBusy{false};
+  std::atomic<bool> threadDone{false};
 
 public:
-  bool isClosed;
+  std::atomic<bool> isClosed{false};
 
   ConnectionState(const std::string dbName, const std::string docPath,
                   int SQLFlags);

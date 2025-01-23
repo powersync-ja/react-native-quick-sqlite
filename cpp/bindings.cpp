@@ -79,6 +79,11 @@ void transactionFinalizerHandler(const TransactionCallbackPayload *payload) {
    */
   invoker->invokeAsync([payload] {
     try {
+      // Prevent trying to create a JSI string for a potentially closed DB
+      if (payload == NULL || payload->dbName == NULL) {
+        return;
+      }
+      
       auto global = runtime->global();
       jsi::Function handlerFunction = global.getPropertyAsFunction(
           *runtime, "triggerTransactionFinalizerHook");

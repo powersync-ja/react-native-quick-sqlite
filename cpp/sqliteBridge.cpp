@@ -50,10 +50,18 @@ sqliteOpenDb(string const dbName, string const docPath,
     };
   }
 
-  dbMap[dbName] = new ConnectionPool(dbName, docPath, numReadConnections);
-  dbMap[dbName]->setOnContextAvailable(contextAvailableCallback);
-  dbMap[dbName]->setTableUpdateHandler(updateTableCallback);
-  dbMap[dbName]->setTransactionFinalizerHandler(onTransactionFinalizedCallback);
+  try {
+    // Open the database
+    dbMap[dbName] = new ConnectionPool(dbName, docPath, numReadConnections);
+    dbMap[dbName]->setOnContextAvailable(contextAvailableCallback);
+    dbMap[dbName]->setTableUpdateHandler(updateTableCallback);
+    dbMap[dbName]->setTransactionFinalizerHandler(onTransactionFinalizedCallback);
+  } catch (const std::exception &e) {
+    return SQLiteOPResult{
+        .type = SQLiteError,
+        .errorMessage = e.what(),
+    };
+  }
 
   return SQLiteOPResult{
       .type = SQLiteOk,
