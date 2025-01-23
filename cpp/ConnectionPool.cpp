@@ -171,6 +171,7 @@ void ConnectionPool::closeContext(ConnectionLockId contextId) {
 void ConnectionPool::closeAll() {
   // Prevent this pointer from being used if closed
   rollbackPayload.dbName = NULL;
+  commitPayload.dbName = NULL;
   sqlite3_commit_hook(writeConnection.connection,
                       NULL, NULL);
   sqlite3_rollback_hook(writeConnection.connection, 
