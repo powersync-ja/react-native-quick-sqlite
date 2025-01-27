@@ -32,6 +32,16 @@ SQLiteOPResult generateNotOpenResult(std::string const &dbName) {
   };
 }
 
+ConnectionPool *getConnection(std::string const dbName) {
+  if (dbMap.count(dbName) == 0) {
+    // Connection is already closed
+    return nullptr;
+  }
+
+  return dbMap[dbName];
+}
+
+
 /**
  * Opens SQL database with default settings
  */

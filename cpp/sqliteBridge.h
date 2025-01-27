@@ -40,6 +40,8 @@ SQLiteOPResult sqliteCloseDb(string const dbName);
 
 void sqliteCloseAll();
 
+ConnectionPool *getConnection(std::string const dbName);
+
 SQLiteOPResult sqliteRemoveDb(string const dbName, string const docPath);
 
 /**

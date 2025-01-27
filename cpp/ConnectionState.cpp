@@ -59,7 +59,6 @@ std::future<void> ConnectionState::refreshSchema() {
 
 void ConnectionState::close() {
   {
-    // Now signal the thread to stop and notify it
     std::unique_lock<std::mutex> g(workQueueMutex);
     // prevent any new work from being queued 
     isClosed = true;

@@ -19,6 +19,7 @@ ConnectionPool::ConnectionPool(std::string dbName, std::string docPath,
 
   onContextCallback = nullptr;
   isConcurrencyEnabled = maxReads > 0;
+  isClosed = false;
 
   readConnections = new ConnectionState *[maxReads];
   // Open the read connections
@@ -169,9 +170,8 @@ void ConnectionPool::closeContext(ConnectionLockId contextId) {
 }
 
 void ConnectionPool::closeAll() {
-  // Prevent this pointer from being used if closed
-  rollbackPayload.dbName = NULL;
-  commitPayload.dbName = NULL;
+  isClosed = true;
+  // Stop any callbacks
   sqlite3_commit_hook(writeConnection.connection,
                       NULL, NULL);
   sqlite3_rollback_hook(writeConnection.connection, 

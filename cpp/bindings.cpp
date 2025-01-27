@@ -77,19 +77,25 @@ void transactionFinalizerHandler(const TransactionCallbackPayload *payload) {
    * This function triggers an async invocation to call watch callbacks,
    * avoiding holding SQLite up.
    */
-  invoker->invokeAsync([payload] {
+
+  // Make a copy of the payload data, this avoids a potential race condition
+  // where the async invocation might occur after closing a connection
+  auto dbName = std::make_shared<std::string>(*payload->dbName);
+  int event = payload->event;
+  invoker->invokeAsync([dbName, event] {
     try {
-      // Prevent trying to create a JSI string for a potentially closed DB
-      if (payload == NULL || payload->dbName == NULL) {
+     
+     ConnectionPool* connection = getConnection(*dbName);
+      if (connection == nullptr || connection->isClosed) {
         return;
       }
-      
+
       auto global = runtime->global();
       jsi::Function handlerFunction = global.getPropertyAsFunction(
           *runtime, "triggerTransactionFinalizerHook");
 
-      auto jsiDbName = jsi::String::createFromAscii(*runtime, *payload->dbName);
-      auto jsiEventType = jsi::Value((int)payload->event);
+      auto jsiDbName = jsi::String::createFromAscii(*runtime, *dbName);
+      auto jsiEventType = jsi::Value(event);
       handlerFunction.call(*runtime, move(jsiDbName), move(jsiEventType));
     } catch (jsi::JSINativeException e) {
       std::cout << e.what() << std::endl;
