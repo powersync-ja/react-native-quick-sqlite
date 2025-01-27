@@ -19,6 +19,7 @@ ConnectionPool::ConnectionPool(std::string dbName, std::string docPath,
 
   onContextCallback = nullptr;
   isConcurrencyEnabled = maxReads > 0;
+  isClosed = false;
 
   readConnections = new ConnectionState *[maxReads];
   // Open the read connections
@@ -94,7 +95,14 @@ ConnectionPool::queueInContext(ConnectionLockId contextId,
     };
   }
 
-  state->queueWork(task);
+  try {
+    state->queueWork(task);
+  } catch (const std::exception &e) {
+    return SQLiteOPResult{
+        .errorMessage = e.what(),
+        .type = SQLiteError,
+    };
+  }
 
   return SQLiteOPResult{
       .type = SQLiteOk,
@@ -162,6 +170,14 @@ void ConnectionPool::closeContext(ConnectionLockId contextId) {
 }
 
 void ConnectionPool::closeAll() {
+  isClosed = true;
+  // Stop any callbacks
+  sqlite3_commit_hook(writeConnection.connection,
+                      NULL, NULL);
+  sqlite3_rollback_hook(writeConnection.connection, 
+                        NULL, NULL);
+  sqlite3_update_hook(writeConnection.connection, 
+                        NULL, NULL);
   writeConnection.close();
   for (int i = 0; i < maxReads; i++) {
     readConnections[i]->close();

@@ -75,6 +75,8 @@ private:
   bool isConcurrencyEnabled;
 
 public:
+  bool isClosed;
+
   ConnectionPool(std::string dbName, std::string docPath,
                  unsigned int numReadConnections);
   ~ConnectionPool();

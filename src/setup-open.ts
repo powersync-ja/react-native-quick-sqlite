@@ -1,20 +1,20 @@
 import {
-  ISQLite,
   ConcurrentLockType,
-  QuickSQLiteConnection,
   ContextLockID,
+  ISQLite,
   LockContext,
   LockOptions,
-  TransactionContext,
-  UpdateCallback,
-  SQLBatchTuple,
   OpenOptions,
-  QueryResult
+  QueryResult,
+  QuickSQLiteConnection,
+  SQLBatchTuple,
+  TransactionContext,
+  UpdateCallback
 } from './types';
 
-import { enhanceQueryResult } from './utils';
 import { DBListenerManagerInternal } from './DBListenerManager';
 import { LockHooks } from './lock-hooks';
+import { enhanceQueryResult } from './utils';
 
 type LockCallbackRecord = {
   callback: (context: LockContext) => Promise<any>;
@@ -60,6 +60,9 @@ global.onLockContextIsAvailable = async (dbName: string, lockId: ContextLockID) 
   setImmediate(async () => {
     try {
       const record = LockCallbacks[lockId];
+      // clear record after fetching, the hash should only contain pending requests
+      delete LockCallbacks[lockId];
+
       if (record?.timeout) {
         clearTimeout(record.timeout);
       }
@@ -116,12 +119,23 @@ export function setupOpen(QuickSQLite: ISQLite) {
         // Wrap the callback in a promise that will resolve to the callback result
         return new Promise<T>((resolve, reject) => {
           // Add callback to the queue for timing
+          const closedListener = listenerManager.registerListener({
+            closed: () => {
+              closedListener?.();
+              // Remove callback from the queue
+              delete LockCallbacks[id];
+              // Reject the lock request if the connection is closed
+              reject(new Error('Connection is closed'));
+            }
+          });
+
           const record = (LockCallbacks[id] = {
             callback: async (context: LockContext) => {
               try {
+                // Remove the close listener
+                closedListener?.();
                 await hooks?.lockAcquired?.();
                 const res = await callback(context);
-
                 closeContextLock(dbName, id);
                 resolve(res);
               } catch (ex) {
@@ -134,6 +148,7 @@ export function setupOpen(QuickSQLite: ISQLite) {
           } as LockCallbackRecord);
 
           try {
+            // throws if lock could not be requested
             QuickSQLite.requestLock(dbName, id, type);
             const timeout = options?.timeoutMs;
             if (timeout) {
@@ -144,6 +159,7 @@ export function setupOpen(QuickSQLite: ISQLite) {
               }, timeout);
             }
           } catch (ex) {
+            closedListener?.();
             // Remove callback from the queue
             delete LockCallbacks[id];
             reject(ex);
@@ -224,7 +240,11 @@ export function setupOpen(QuickSQLite: ISQLite) {
 
       // Return the concurrent connection object
       return {
-        close: () => QuickSQLite.close(dbName),
+        close: () => {
+          QuickSQLite.close(dbName);
+          // Close any pending listeners
+          listenerManager.iterateListeners((l) => l.closed?.());
+        },
         refreshSchema: () => QuickSQLite.refreshSchema(dbName),
         execute: (sql: string, args?: any[]) => writeLock((context) => context.execute(sql, args)),
         readLock,

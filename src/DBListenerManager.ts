@@ -39,6 +39,8 @@ export interface DBListener extends BaseListener {
    * is started, committed or rolled back.
    */
   writeTransaction: (event: WriteTransactionEvent) => void;
+
+  closed: () => void;
 }
 
 export class DBListenerManager extends BaseObserver<DBListener> {}

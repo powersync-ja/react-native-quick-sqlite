@@ -32,6 +32,16 @@ SQLiteOPResult generateNotOpenResult(std::string const &dbName) {
   };
 }
 
+ConnectionPool *getConnection(std::string const dbName) {
+  if (dbMap.count(dbName) == 0) {
+    // Connection is already closed
+    return nullptr;
+  }
+
+  return dbMap[dbName];
+}
+
+
 /**
  * Opens SQL database with default settings
  */
@@ -50,10 +60,18 @@ sqliteOpenDb(string const dbName, string const docPath,
     };
   }
 
-  dbMap[dbName] = new ConnectionPool(dbName, docPath, numReadConnections);
-  dbMap[dbName]->setOnContextAvailable(contextAvailableCallback);
-  dbMap[dbName]->setTableUpdateHandler(updateTableCallback);
-  dbMap[dbName]->setTransactionFinalizerHandler(onTransactionFinalizedCallback);
+  try {
+    // Open the database
+    dbMap[dbName] = new ConnectionPool(dbName, docPath, numReadConnections);
+    dbMap[dbName]->setOnContextAvailable(contextAvailableCallback);
+    dbMap[dbName]->setTableUpdateHandler(updateTableCallback);
+    dbMap[dbName]->setTransactionFinalizerHandler(onTransactionFinalizedCallback);
+  } catch (const std::exception &e) {
+    return SQLiteOPResult{
+        .type = SQLiteError,
+        .errorMessage = e.what(),
+    };
+  }
 
   return SQLiteOPResult{
       .type = SQLiteOk,
@@ -126,13 +144,6 @@ SQLiteOPResult sqliteRequestLock(std::string const dbName,
 
   ConnectionPool *connection = dbMap[dbName];
 
-  if (connection == nullptr) {
-    return SQLiteOPResult{
-        .type = SQLiteOk,
-
-    };
-  }
-
   switch (lockType) {
   case ConcurrentLockType::ReadLock:
     connection->readLock(contextId);
@@ -147,6 +158,7 @@ SQLiteOPResult sqliteRequestLock(std::string const dbName,
 
   return SQLiteOPResult{
       .type = SQLiteOk,
+      
   };
 }
 

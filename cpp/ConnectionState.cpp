@@ -10,23 +10,17 @@ SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,
 ConnectionState::ConnectionState(const std::string dbName,
                                  const std::string docPath, int SQLFlags) {
   auto result = genericSqliteOpenDb(dbName, docPath, &connection, SQLFlags);
-
-  this->clearLock();
-  threadDone = false;
-  thread = new std::thread(&ConnectionState::doWork, this);
+   if (result.type != SQLiteOk) {
+    throw std::runtime_error("Failed to open SQLite database: " + result.errorMessage);
+  }
+   thread = std::thread(&ConnectionState::doWork, this);
+   this->clearLock();
 }
 
 ConnectionState::~ConnectionState() {
-  // So threads know it's time to shut down
-  threadDone = true;
-
-  // Wake up all the threads, so they can finish and be joined
-  workQueueConditionVariable.notify_all();
-  if (thread->joinable()) {
-    thread->join();
+  if (!isClosed) {
+    close();
   }
-
-  delete thread;
 }
 
 void ConnectionState::clearLock() {
@@ -64,21 +58,41 @@ std::future<void> ConnectionState::refreshSchema() {
 }
 
 void ConnectionState::close() {
+  {
+    std::unique_lock<std::mutex> g(workQueueMutex);
+    // prevent any new work from being queued 
+    isClosed = true;
+  }
+
+  // Wait for the work queue to empty
   waitFinished();
-  // So that the thread can stop (if not already)
-  threadDone = true;
+
+  {
+    // Now signal the thread to stop and notify it
+    std::unique_lock<std::mutex> g(workQueueMutex);
+    threadDone = true;
+    workQueueConditionVariable.notify_all();
+  }
+
+  // Join the worker thread
+  if (thread.joinable()) {
+    thread.join();
+  }
+
+  // Safely close the SQLite connection
   sqlite3_close_v2(connection);
 }
 
 void ConnectionState::queueWork(std::function<void(sqlite3 *)> task) {
-  // Grab the mutex
-  std::lock_guard<std::mutex> g(workQueueMutex);
+  {
+    std::unique_lock<std::mutex> g(workQueueMutex);
+    if (isClosed) {
+      throw std::runtime_error("Connection is not open. Connection has been closed before queueing work.");
+    }
+    workQueue.push(task);
+  }
 
-  // Push the request to the queue
-  workQueue.push(task);
-
-  // Notify one thread that there are requests to process
-  workQueueConditionVariable.notify_all();
+  workQueueConditionVariable.notify_all(); 
 }
 
 void ConnectionState::doWork() {
@@ -104,9 +118,9 @@ void ConnectionState::doWork() {
       workQueue.pop();
     }
 
-    ++threadBusy;
+    threadBusy = true;
     task(connection);
-    --threadBusy;
+    threadBusy = false;
     // Need to notify in order for waitFinished to be updated when
     // the queue is empty and not busy
     {
@@ -118,11 +132,8 @@ void ConnectionState::doWork() {
 
 void ConnectionState::waitFinished() {
   std::unique_lock<std::mutex> g(workQueueMutex);
-  if (workQueue.empty()) {
-    return;
-  }
   workQueueConditionVariable.wait(
-      g, [&] { return workQueue.empty() && (threadBusy == 0); });
+      g, [&] { return workQueue.empty() && !threadBusy; });
 }
 
 SQLiteOPResult genericSqliteOpenDb(string const dbName, string const docPath,

@@ -58,6 +58,9 @@ jobs:
           cd tests
           yarn install --frozen-lockfile
 
+      - name: Initialize Android Folder
+        run: mkdir -p ~/.android/avd
+
       - name: create AVD and generate snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'
         uses: reactivecircus/android-emulator-runner@v2.28.0
