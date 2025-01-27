@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 2.4.0
+
+### Minor Changes
+
+- 43598db: Improved behaviour for closing a database connection. This should prevent some crash issues.
+
 ## 2.3.0
 
 ### Minor Changes
