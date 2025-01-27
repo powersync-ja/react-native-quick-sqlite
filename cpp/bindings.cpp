@@ -99,6 +99,8 @@ void transactionFinalizerHandler(const TransactionCallbackPayload *payload) {
       handlerFunction.call(*runtime, move(jsiDbName), move(jsiEventType));
     } catch (jsi::JSINativeException e) {
       std::cout << e.what() << std::endl;
+    } catch (const std::exception& e) {
+      std::cout << "Standard Exception: " << e.what() << std::endl;
     } catch (...) {
       std::cout << "Unknown error" << std::endl;
     }
