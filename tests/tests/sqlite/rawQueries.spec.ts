@@ -80,6 +80,7 @@ export function registerBaseTests() {
   describe('PowerSync', () => {
     it('should load the extension', async () => {
       const rs = await db.execute('select powersync_rs_version() as version');
+      console.log('core version', JSON.stringify(rs.rows));
       // TODO: Check the version?
       // expect(rs.rows.item(0).version).to.equal('0.2.0...');
     });
