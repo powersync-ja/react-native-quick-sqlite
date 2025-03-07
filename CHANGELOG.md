@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 2.4.2
+
+### Patch Changes
+
+- 85b8906: Update core PowerSync extension to 0.3.12
+
 ## 2.4.1
 
 ### Patch Changes
