@@ -1,10 +1,13 @@
-const { withDangerousMod } = require('@expo/config-plugins');
+const { ConfigPlugin, withDangerousMod, createRunOncePlugin } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
+// Define package metadata
+const pkg = { name: '@journeyapps/react-native-quick-sqlite', version: 'UNVERSIONED' };
+
+// Function to modify the Podfile
 function modifyPodfile(podfilePath) {
   let podfile = fs.readFileSync(podfilePath, 'utf8');
-
   const preinstallScript = `
 pre_install do |installer|
   installer.pod_targets.each do |pod|
@@ -16,23 +19,29 @@ pre_install do |installer|
   end
 end
 `;
-
-  // Ensure we don't add duplicate scripts
+  // Ensure script is added only once
   if (!podfile.includes('react-native-quick-sqlite')) {
     podfile = podfile.replace(/target\s+'[^']+'\s+do/, `$&\n${preinstallScript}`);
     fs.writeFileSync(podfilePath, podfile, 'utf8');
+    console.log(`Added pre_install script for react-native-quick-sqlite to Podfile`);
   }
 }
 
-const withPowerSyncQuickSQLite = (config) => {
+// Config Plugin
+const withUseFrameworks = (config) => {
   return withDangerousMod(config, [
     'ios',
     (config) => {
       const podfilePath = path.join(config.modRequest.platformProjectRoot, 'Podfile');
-      modifyPodfile(podfilePath);
+      if (fs.existsSync(podfilePath)) {
+        modifyPodfile(podfilePath);
+      } else {
+        console.warn(`Podfile not found at ${podfilePath}`);
+      }
       return config;
-    },
+    }
   ]);
 };
 
-module.exports = withPowerSyncQuickSQLite;
+// Export the plugin with Expo's createRunOncePlugin
+module.exports = createRunOncePlugin(withUseFrameworks, pkg.name, pkg.version);
