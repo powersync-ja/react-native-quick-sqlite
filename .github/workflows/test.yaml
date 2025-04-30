@@ -33,7 +33,7 @@ jobs:
           key: avd-31
 
       - name: Setup NodeJS
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: 'yarn'
@@ -108,7 +108,7 @@ jobs:
           key: ${{ runner.os }}-${{ hashFiles('tests/ios/Podfile.lock') }}
 
       - name: Setup NodeJS
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: 'yarn'
