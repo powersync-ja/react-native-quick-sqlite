@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 2.4.4
+
+### Patch Changes
+
+- d743f0c: Update SQLite from 3.39.4 to 3.49.1
+
 ## 2.4.3
 
 ### Patch Changes
