@@ -8,15 +8,9 @@ It is **not** intended to be used independently, use [PowerSync React Native SDK
 
 ### For Expo
 
-#### Using `use_frameworks!` on iOS? Add the Config Plugin
+#### iOS with `use_frameworks!`
 
-If your iOS project uses `use_frameworks!`, you need to add the config plugin to your **app.json** or **app.config.js** to ensure proper setup.
-
-#### Steps to Add the Plugin
-
-#### **For `app.json` (Recommended for most users):**
-
-Add the following snippet inside the `"expo"` section:
+If your iOS project uses `use_frameworks!`, add the config plugin to your **app.json** or **app.config.js**:
 
 ```json
 {
@@ -25,3 +19,5 @@ Add the following snippet inside the `"expo"` section:
   }
 }
 ```
+
+This plugin automatically configures the necessary build settings for `react-native-quick-sqlite` to work with `use_frameworks!`.
