@@ -1,5 +1,12 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 2.4.5
+
+### Patch Changes
+
+- 2fd1357: Added expo config plugin, that automatically applies podfile changes needed for use_frameworks when `staticLibrary` option is specified for the plugin.
+- a1d1911: Fix crash when binding or reading blobs.
+
 ## 2.4.4
 
 ### Patch Changes
