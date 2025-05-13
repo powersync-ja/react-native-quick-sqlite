@@ -6,11 +6,7 @@ const path = require('path');
 const pkg = { name: '@journeyapps/react-native-quick-sqlite', version: 'UNVERSIONED' };
 
 // Function to modify the Podfile
-function modifyPodfile(podfilePath: string, staticLibrary: boolean) {
-  if (!staticLibrary) {
-    return;
-  }
-
+function modifyPodfile(podfilePath: string) {
   let podfile = fs.readFileSync(podfilePath, 'utf8');
   const preinstallScript = `
 pre_install do |installer|
@@ -38,9 +34,13 @@ const withUseFrameworks = (config, options = { staticLibrary: false }) => {
   return withDangerousMod(config, [
     'ios',
     (config) => {
+      if (!staticLibrary) {
+        return config;
+      }
+
       const podfilePath = path.join(config.modRequest.platformProjectRoot, 'Podfile');
       if (fs.existsSync(podfilePath)) {
-        modifyPodfile(podfilePath, staticLibrary);
+        modifyPodfile(podfilePath);
       } else {
         console.warn(`Podfile not found at ${podfilePath}`);
       }
