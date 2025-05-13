@@ -10,12 +10,19 @@ It is **not** intended to be used independently, use [PowerSync React Native SDK
 
 #### iOS with `use_frameworks!`
 
-If your iOS project uses `use_frameworks!`, add the config plugin to your **app.json** or **app.config.js**:
+If your iOS project uses `use_frameworks!`, add the `react-native-quick-sqlite` plugin to your **app.json** or **app.config.js** and configure the `staticLibrary` option:
 
 ```json
 {
   "expo": {
-    "plugins": [["@journeyapps/react-native-quick-sqlite"]]
+    "plugins": [
+      [
+        "@journeyapps/react-native-quick-sqlite",
+        {
+          "staticLibrary": true
+        }
+      ]
+    ]
   }
 }
 ```
