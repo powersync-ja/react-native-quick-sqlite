@@ -133,6 +133,21 @@ export function registerBaseTests() {
       ]);
     });
 
+    it('binding blobs', async () => {
+      const data = new TextEncoder().encode('hello blob');
+      const res = await db.execute('SELECT hex(?) AS r', [data.buffer]);
+
+      expect(res.rows?._array).to.eql([{ r: '68656C6C6F20626C6F62' }]);
+    });
+
+    it('reading blobs', async () => {
+      const res = await db.execute('SELECT unhex(1234) AS r');
+      const value = res.rows._array[0].r;
+
+      expect(value).to.be.instanceOf(ArrayBuffer);
+      expect([...new Uint8Array(value)]).to.eql([18, 52]);
+    });
+
     it('Failed insert', async () => {
       const id = chance.string(); // Setting the id to a string will throw an exception, it expects an int
       const { name, age, networth } = generateUserInfo();

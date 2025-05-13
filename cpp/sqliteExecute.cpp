@@ -8,7 +8,7 @@ void bindStatement(sqlite3_stmt *statement, vector<QuickValue> *values) {
 
   for (int ii = 0; ii < size; ii++) {
     int sqIndex = ii + 1;
-    QuickValue value = values->at(ii);
+    const QuickValue& value = values->at(ii);
     QuickDataType dataType = value.dataType;
     if (dataType == NULL_VALUE) {
       sqlite3_bind_null(statement, sqIndex);
@@ -24,8 +24,8 @@ void bindStatement(sqlite3_stmt *statement, vector<QuickValue> *values) {
       sqlite3_bind_text(statement, sqIndex, value.textValue.c_str(),
                         value.textValue.length(), SQLITE_TRANSIENT);
     } else if (dataType == ARRAY_BUFFER) {
-      sqlite3_bind_blob(statement, sqIndex, value.arrayBufferValue.get(),
-                        value.arrayBufferSize, SQLITE_STATIC);
+      sqlite3_bind_blob(statement, sqIndex, value.arrayBuffer.data(),
+                        value.arrayBuffer.size(), SQLITE_STATIC);
     }
   }
 }
@@ -114,9 +114,7 @@ sqliteExecuteWithDB(sqlite3 *db, std::string const &query,
         case SQLITE_BLOB: {
           int blob_size = sqlite3_column_bytes(statement, i);
           const void *blob = sqlite3_column_blob(statement, i);
-          uint8_t *data;
-          memcpy(data, blob, blob_size);
-          row[column_name] = createArrayBufferQuickValue(data, blob_size);
+          row[column_name] = createArrayBufferQuickValueByCopying(static_cast<const uint8_t*>(blob), blob_size);
           break;
         }
 
