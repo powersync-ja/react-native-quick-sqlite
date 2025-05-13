@@ -7,6 +7,8 @@
 
 #include "JSIHelper.h"
 
+#include <utility>
+
 using namespace std;
 using namespace facebook;
 
@@ -27,7 +29,7 @@ QuickValue createTextQuickValue(string value)
 {
   return QuickValue{
     .dataType = TEXT,
-    .textValue = value};
+    .textValue = std::move(value)};
 }
 
 QuickValue createIntegerQuickValue(int value)
@@ -58,12 +60,13 @@ QuickValue createDoubleQuickValue(double value)
     .doubleOrIntValue = value};
 }
 
-QuickValue createArrayBufferQuickValue(uint8_t *arrayBufferValue, size_t arrayBufferSize)
+QuickValue createArrayBufferQuickValueByCopying(const uint8_t *arrayBufferValue, size_t arrayBufferSize)
 {
+  vector<uint8_t> copy(arrayBufferValue, arrayBufferValue + arrayBufferSize);
+
   return QuickValue{
     .dataType = ARRAY_BUFFER,
-    .arrayBufferValue = shared_ptr<uint8_t>{arrayBufferValue},
-    .arrayBufferSize = arrayBufferSize};
+    .arrayBuffer = copy};
 }
 
 void jsiQueryArgumentsToSequelParam(jsi::Runtime &rt, jsi::Value const &params, vector<QuickValue> *target)
@@ -116,7 +119,7 @@ void jsiQueryArgumentsToSequelParam(jsi::Runtime &rt, jsi::Value const &params, 
       if (obj.isArrayBuffer(rt))
       {
         auto buf = obj.getArrayBuffer(rt);
-        target->push_back(createArrayBufferQuickValue(buf.data(rt), buf.size(rt)));
+        target->push_back(createArrayBufferQuickValueByCopying(buf.data(rt), buf.size(rt)));
       }
     }
     else
@@ -171,10 +174,10 @@ jsi::Value createSequelQueryExecutionResult(jsi::Runtime &rt, SQLiteOPResult sta
           } else if (value.dataType == ARRAY_BUFFER)
           {
             jsi::Function array_buffer_ctor = rt.global().getPropertyAsFunction(rt, "ArrayBuffer");
-            jsi::Object o = array_buffer_ctor.callAsConstructor(rt, (int) value.arrayBufferSize).getObject(rt);
+            jsi::Object o = array_buffer_ctor.callAsConstructor(rt, (int) value.arrayBuffer.size()).getObject(rt);
             jsi::ArrayBuffer buf = o.getArrayBuffer(rt);
             // It's a shame we have to copy here: see https://github.com/facebook/hermes/pull/419 and https://github.com/facebook/hermes/issues/564.
-            memcpy(buf.data(rt), value.arrayBufferValue.get(), value.arrayBufferSize);
+            memcpy(buf.data(rt), value.arrayBuffer.data(), value.arrayBuffer.size());
             rowObject.setProperty(rt, columnName.c_str(), o);
           } else
           {

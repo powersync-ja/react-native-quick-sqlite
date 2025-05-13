@@ -41,8 +41,7 @@ struct QuickValue
   double doubleOrIntValue;
   long long int64Value;
   string textValue;
-  shared_ptr<uint8_t> arrayBufferValue;
-  size_t arrayBufferSize;
+  vector<uint8_t> arrayBuffer;
 };
 
 /**
@@ -108,7 +107,7 @@ QuickValue createIntegerQuickValue(int value);
 QuickValue createIntegerQuickValue(double value);
 QuickValue createInt64QuickValue(long long value);
 QuickValue createDoubleQuickValue(double value);
-QuickValue createArrayBufferQuickValue(uint8_t *arrayBufferValue, size_t arrayBufferSize);
+QuickValue createArrayBufferQuickValueByCopying(const uint8_t *arrayBufferValue, size_t arrayBufferSize);
 jsi::Value createSequelQueryExecutionResult(jsi::Runtime &rt, SQLiteOPResult status, vector<map<string, QuickValue>> *results, vector<QuickColumnMetadata> *metadata);
 
 #endif /* JSIHelper_h */
