@@ -1,1 +1,1 @@
-module.exports = require('./src/withUseFrameworks').default;
+module.exports = require('./lib/commonjs/withUseFrameworks');
