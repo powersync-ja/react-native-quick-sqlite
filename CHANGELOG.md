@@ -1,5 +1,11 @@
 # @journeyapps/react-native-quick-sqlite
 
+## 2.4.10
+
+### Patch Changes
+
+- 36b37d8: Support 16KB page sizes when building with NDK version 27+
+
 ## 2.4.9
 
 ### Patch Changes
