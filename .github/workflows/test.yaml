@@ -10,7 +10,7 @@ jobs:
     env:
       AVD_NAME: ubuntu-avd-x86_64-31
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
 
@@ -33,13 +33,13 @@ jobs:
           key: avd-31
 
       - name: Setup NodeJS
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 18
           cache: 'yarn'
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v5
         with:
           java-version: 17
           distribution: 'adopt'
@@ -90,7 +90,7 @@ jobs:
     name: Test iOS (Only build)
     runs-on: macOS-13
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
 
@@ -108,7 +108,7 @@ jobs:
           key: ${{ runner.os }}-${{ hashFiles('tests/ios/Podfile.lock') }}
 
       - name: Setup NodeJS
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 18
           cache: 'yarn'
