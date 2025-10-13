@@ -76,6 +76,8 @@ android {
     externalNativeBuild {
         cmake {
             cppFlags "-O2", "-fexceptions", "-frtti", "-std=c++1y", "-DONANDROID"
+            // For 16KB-aligned pages with NDK r27: https://developer.android.com/guide/practices/page-sizes#groovy_1
+            arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
             abiFilters 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
             arguments '-DANDROID_STL=c++_shared',
               "-DSQLITE_FLAGS='${SQLITE_FLAGS ? SQLITE_FLAGS : ''}'",
