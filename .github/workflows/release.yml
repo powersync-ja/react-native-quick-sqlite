@@ -28,6 +28,10 @@ jobs:
         with:
           node-version: 24
           cache: yarn
+      - name: Update npm
+        run: |
+          npm install -g npm@latest
+          npm --version
 
       # This also builds the package as part of the post install
       - name: Install Dependencies
