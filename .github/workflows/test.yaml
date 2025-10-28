@@ -13,6 +13,8 @@ jobs:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Enable KVM group perms
         run: |
@@ -33,9 +35,9 @@ jobs:
           key: avd-31
 
       - name: Setup NodeJS
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
-          node-version: 18
+          node-version: 24
           cache: 'yarn'
 
       - name: Set up JDK 17
@@ -44,11 +46,6 @@ jobs:
           java-version: 17
           distribution: 'adopt'
           cache: 'gradle'
-
-      - name: Setup Yarn
-        run: |
-          npm install -g yarn
-          echo "Yarn version: $(yarn -v)"
 
       - name: Install Dependencies
         run: yarn install --frozen-lockfile
@@ -93,6 +90,8 @@ jobs:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
+      - name: Enable Corepack
+        run: corepack enable
 
       - uses: irgaly/xcode-cache@v1
         if: false # Currently broken, see e.g. https://github.com/powersync-ja/react-native-quick-sqlite/actions/runs/18458692696/job/52584961537
@@ -111,13 +110,8 @@ jobs:
       - name: Setup NodeJS
         uses: actions/setup-node@v5
         with:
-          node-version: 18
+          node-version: 24
           cache: 'yarn'
-
-      - name: Setup Yarn
-        run: |
-          npm install -g yarn
-          echo "Yarn version: $(yarn -v)"
 
       - name: Install Dependencies
         run: yarn install --frozen-lockfile
