@@ -9,20 +9,16 @@ jobs:
     name: Build Packages
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
-
+      - name: Enable Corepack
+        run: corepack enable
       - name: Setup NodeJS
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 18
+          node-version: 24
           cache: 'yarn'
-
-      - name: Setup Yarn
-        run: |
-          npm install -g yarn
-          echo "Yarn version: $(yarn -v)"
 
       # Build is triggered in prepare script
       - name: Install Dependencies
