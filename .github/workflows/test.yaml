@@ -85,7 +85,7 @@ jobs:
 
   test-ios:
     name: Test iOS (Only build)
-    runs-on: macOS-13
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v5
         with:
