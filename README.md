@@ -1,3 +1,7 @@
+> [!CAUTION]
+> This package is deprecated. Since version 2 of the PowerSync React Native SDK, it is no longer supported
+> (OP-SQLite is the only available implementation, and built in to the React Native SDK).
+
 <p align="center">
   <a href="https://www.powersync.com" target="_blank"><img src="https://github.com/powersync-ja/react-native-quick-sqlite/assets/19345049/40e62305-1089-4277-a6ac-dfc18934c114"/></a>
 </p>
